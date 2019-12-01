@@ -91,7 +91,7 @@ bool CMux::Muxing()
 	stringstream sstm;
 	sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel;
 	system(sstm.str().c_str());
-	// clear method is not working
+	// clear method is not working then .str("") correct
 	sstm.str("");
 
 	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".mp4";
@@ -109,20 +109,11 @@ bool CMux::Muxing()
 	while (!m_bExit)
 	{
 		m_nRecSec = m_attr["rec_sec"].asInt();
-		AVPacket *pPkt = NULL;
-		if (m_queue->Get(pPkt) > 0)
+		AVPacket pPkt;
+		if (m_queue->Get(&pPkt) > 0)
 		{
-			if (pPkt)
-			{
-				m_pMuxer->put_data(pPkt);
-				m_queue->Ret(pPkt);
-			}
-			else
-			{
-				cout << "[CMUX] queue is empty" << endl;
-				usleep(50000);
-				continue;
-			}
+			m_pMuxer->put_data(&pPkt);
+			m_queue->Ret(&pPkt);
 		}
 		else
 		{

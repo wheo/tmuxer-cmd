@@ -37,6 +37,7 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_file_idx = 0;
 
 	m_queue = new CQueue();
+	m_queue->SetChannel(m_nChannel);
 	m_mux = new CMux();
 	m_queue->Enable();
 	m_mux->SetQueue(&m_queue, m_nChannel);
@@ -290,7 +291,7 @@ void CRecv::Delete()
 {
 	close(m_sock);
 	//SAFE_DELETE(m_pMuxer);
-	SAFE_DELETE(m_queue);
+	//SAFE_DELETE(m_queue);
 #if __DEBUG
 	cout << "sock " << m_sock << " closed" << endl;
 #endif

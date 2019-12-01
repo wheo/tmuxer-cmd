@@ -3,7 +3,7 @@
 
 CQueue::CQueue()
 {
-	m_nMaxQueue = 0;
+	m_nMaxQueue = MAX_NUM_QUEUE;
 	m_nSizeQueue = 0;
 	m_pBuffer = NULL;
 
@@ -22,9 +22,9 @@ CQueue::~CQueue()
 	pthread_mutex_destroy(&m_mutex);
 }
 
-void CQueue::Create(int nNum)
+void CQueue::SetChannel(int nChannel)
 {
-	m_nMaxQueue = nNum;
+	m_nChannel = nChannel;
 }
 
 void CQueue::Clear()
@@ -65,8 +65,12 @@ int CQueue::Put(AVPacket *pkt)
 			av_init_packet(&m_pkt[m_nWritePos]);
 			av_packet_ref(&m_pkt[m_nWritePos], pkt);
 			av_packet_unref(pkt);
-			//_d("put pos : ( %d ), stream_index : %d, data ( %p ), size ( %d )\n", m_nWritePos, pkt->stream_index, m_pkt[m_nWritePos].data, m_pkt[m_nWritePos].size);
-
+#if __DEBUG
+			if (m_nChannel == 0)
+			{
+				_d("put pos : ( %d ), stream_index : %d, data ( %p ), size ( %d )\n", m_nWritePos, pkt->stream_index, m_pkt[m_nWritePos].data, m_pkt[m_nWritePos].size);
+			}
+#endif
 			m_nWritePos++;
 			if (m_nWritePos >= m_nMaxQueue)
 			{
@@ -111,7 +115,12 @@ int CQueue::Get(AVPacket *pkt)
 				return NULL;
 			}
 #endif
-			//_d("get pos ( %d ), size ( %d ), data ( %p ),  type : %d, m_nPacket : %d, m_nDelay : %d\n", m_nReadPos, m_pkt[m_nReadPos].size, m_pkt[m_nReadPos].data, m_pkt[m_nReadPos].stream_index, m_nPacket, m_nDelay);
+#if __DEBUG
+			if (m_nChannel == 0)
+			{
+				_d("get pos ( %d ), size ( %d ), data ( %p ),  type : %d, m_nPacket : %d\n", m_nReadPos, m_pkt[m_nReadPos].size, m_pkt[m_nReadPos].data, m_pkt[m_nReadPos].stream_index, m_nPacket);
+			}
+#endif
 			av_packet_unref(&m_pkt[m_nReadPos]);
 			pthread_mutex_unlock(&m_mutex);
 			return pkt->size;
@@ -128,6 +137,12 @@ void CQueue::Ret(AVPacket *pkt)
 	av_packet_unref(pkt);
 
 	m_nReadPos++;
+#if __DEBUG
+	if (m_nChannel == 0)
+	{
+		cout << "m_nReadPos : " << m_nReadPos << endl;
+	}
+#endif
 	if (m_nReadPos >= m_nMaxQueue)
 	{
 		m_nReadPos = 0;

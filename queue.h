@@ -11,7 +11,7 @@ public:
 	CQueue();
 	~CQueue();
 
-	void Create(int nNum);
+	void SetChannel(int nChannel);
 	void Clear();
 
 	int Put(AVPacket *pkt);
