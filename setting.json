@@ -4,6 +4,7 @@
 	"make_folder_interval": 30,
 	"rec_sec": 30,
 	"codec": 1,
+	"udp_port": 5006,
 	"channels": [
 		{
 			"ip": "228.67.43.91",

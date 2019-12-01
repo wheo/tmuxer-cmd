@@ -10,7 +10,6 @@
 #include <signal.h>
 #include <pthread.h>
 #include <unistd.h>
-#include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -25,10 +24,12 @@
 #include <fstream>
 #include <iomanip>
 #include <ctime>
+#include <string>
 
 #include "json/json.h"
 
-extern "C" {
+extern "C"
+{
 #include "libavutil/opt.h"
 #include "libavcodec/avcodec.h"
 #include "libavformat/avformat.h"
@@ -41,23 +42,35 @@ extern "C" {
 #include "libswresample/swresample.h"
 }
 
-
 #include "misc.h"
+
+using namespace std;
 
 #define PACKET_SIZE 4096
 
 #ifdef DEBUG
 #undef DEBUG
-#define _d(fmt, args...) { printf(fmt, ## args); }
+#define _d(fmt, args...)     \
+    {                        \
+        printf(fmt, ##args); \
+    }
 #else
 #undef DEBUG
-#define _d(fmt, args...) { printf(fmt, ## args); }
+#define _d(fmt, args...)     \
+    {                        \
+        printf(fmt, ##args); \
+    }
 //#define _d(fmt, args...)
 #endif
 
-#define MAX_PROFILES			5
-#define MAX_AUDIO_TRACKS		2
-#define STAT_VIDEO_LOST			0x1000
+#define MAX_PROFILES 5
+#define MAX_AUDIO_TRACKS 2
+#define STAT_VIDEO_LOST 0x1000
 
-#define SAFE_DELETE(x) { if (x) delete x; x = NULL; }
+#define SAFE_DELETE(x) \
+    {                  \
+        if (x)         \
+            delete x;  \
+        x = NULL;      \
+    }
 #endif

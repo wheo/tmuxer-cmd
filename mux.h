@@ -1,25 +1,22 @@
-#ifndef _RECV_H_
-#define _RECV_H_
+#ifndef _MUX_H_
+#define _MUX_H_
 
 #include "main.h"
 #include "tsmuxer.h"
-#include "videoglobal.h"
 #include "queue.h"
-#include "mux.h"
 
-class CRecv : public PThread
+class CMux : public PThread
 {
 public:
-	CRecv(void);
-	~CRecv(void);
-
-	bool send_bitstream(uint8_t *stream, int size);
+	CMux(void);
+	~CMux(void);
 
 	int ReadSocket(uint8_t *buffer, unsigned bufferSize);
 	bool Create(Json::Value info, Json::Value attr, int nChannel);
 	void Delete();
+	bool SetQueue(CQueue **queue, int nChannel);
 
-	bool Receive();
+	bool Muxing();
 
 	void log(int type, int state);
 
@@ -29,10 +26,8 @@ protected:
 	Json::Value m_attr; // 채널 공유 속성 attribute
 
 	char m_strShmPrefix[32];
-	int m_nRead;
-	int m_nWrite;
 
-	pthread_mutex_t m_mutex_recv;
+	pthread_mutex_t m_mutex_mux;
 
 private:
 	//mux_cfg_s m_mux_cfg;
@@ -47,13 +42,10 @@ private:
 
 	CTSMuxer *m_pMuxer;
 	CQueue *m_queue;
-	CMux *m_mux;
 
 protected:
 	void Run();
 	void OnTerminate(){};
 };
 
-extern CRecv *ipc;
-
-#endif // _RECV
+#endif // _MUX

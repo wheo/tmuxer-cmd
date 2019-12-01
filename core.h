@@ -2,10 +2,10 @@
 #define _CCORE_H_
 
 #define MAX_NUM_TRAPS 32
-#define MAX_NUM_CHANNEL 6
 
 #include "recv.h"
 #include "comm.h"
+#include "queue.h"
 
 class CCore : public PThread
 {
@@ -23,7 +23,7 @@ private:
 	int m_nChannel;
 	Json::Value m_root;
 	Json::Reader m_reader;
-	CRecv *m_CRecv[MAX_NUM_CHANNEL];
+
 	CCommMgr *m_comm;
 
 protected:

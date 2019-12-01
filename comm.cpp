@@ -1,18 +1,21 @@
 #include "comm.h"
 
-using namespace std;
-
 CCommMgr::CCommMgr()
 {
 }
 
 CCommMgr::~CCommMgr()
 {
+    Delete();
+    close(m_sdListen);
 }
 
-bool CCommMgr::Open(int nPort)
+bool CCommMgr::Open(int nPort, Json::Value attr)
 {
+    m_nChannel = 0;
+    m_bIsRunning = false;
     m_nPort = nPort;
+    m_attr = attr;
     Start();
 
     return true;
@@ -49,8 +52,7 @@ void CCommMgr::Run()
     while (!m_bExit)
     {
         recvfrom(m_sdListen, buff, 4, 0, (struct sockaddr *)&sin, &sin_size);
-        _d("%c %c %c %c\n", buff[0], buff[1], buff[2], buff[3]);
-
+        //_d("%c %c %c %c\n", buff[0], buff[1], buff[2], buff[3]);
         if (buff[0] == 't' && buff[1] == 'n')
         {
             if (buff[2] == '0')
@@ -58,20 +60,54 @@ void CCommMgr::Run()
                 if (buff[3] == '1')
                 {
                     _d("tn01 실행\n");
+                    if (!m_bIsRunning)
+                    {
+                        m_bIsRunning = true;
+                        for (auto &value : m_attr["channels"])
+                        {
+                            m_CRecv[m_nChannel] = new CRecv();
+                            m_CRecv[m_nChannel]->Create(m_attr["channels"][m_nChannel], m_attr, m_nChannel);
+                            m_nChannel++;
+                        }
+                    }
+                    else
+                    {
+                        cout << "실행 중" << endl;
+                    }
                 }
                 else if (buff[3] == '2')
                 {
                     _d("tn02 실행\n");
+                    if (m_bIsRunning)
+                    {
+                        Delete();
+                        _d("muxing 종료\n");
+                        m_nChannel = 0;
+                        m_bIsRunning = false;
+                    }
+                    else
+                    {
+                        _d("실행 중이 아닙니다.\n");
+                    }
                 }
             }
+            sendto(m_sdListen, buff, 4, 0, (struct sockaddr *)&sin, sin_size);
+            cout << "ip : " << inet_ntoa(sin.sin_addr) << " send message : " << buff << endl;
         }
         else
         {
             _d("[CCT] Unknown sync code...%c %c %c %c\n", buff[0], buff[1], buff[2], buff[3]);
         }
     }
-
     _d("[CMGR] exit loop\n");
+}
+
+void CCommMgr::Delete()
+{
+    for (int i = 0; i < m_nChannel; i++)
+    {
+        SAFE_DELETE(m_CRecv[i]);
+    }
 }
 
 CCommBase::CCommBase()

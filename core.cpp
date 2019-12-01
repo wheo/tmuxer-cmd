@@ -60,10 +60,14 @@ bool CCore::Create()
 
 			Json::Value attr;
 
+			attr = m_root;
+#if 0
+			attr["channels"] = m_root["channels"];
 			attr["file_dst"] = m_root["file_dst"];
 			attr["make_folder_interval"] = m_root["make_folder_interval"];
 			attr["rec_sec"] = m_root["rec_sec"];
 			attr["codec"] = m_root["codec"];
+			attr["udp_port"] = m_root["udp_port"];
 
 			for (auto &value : m_root["channels"])
 			{
@@ -77,11 +81,11 @@ bool CCore::Create()
 				m_CRecv[m_nChannel]->Create(m_root["channels"][m_nChannel], attr, m_nChannel);
 				m_nChannel++;
 			}
+#endif
+			m_comm = new CCommMgr();
+			m_comm->Open(attr["udp_port"].asInt(), attr);
 		}
 	}
-
-	m_comm = new CCommMgr();
-	m_comm->Open(5006);
 
 	Start();
 	return true;
@@ -102,9 +106,11 @@ void CCore::Run()
 
 void CCore::Delete()
 {
+#if 0
 	for (int i = 0; i < m_nChannel; i++)
 	{
 		SAFE_DELETE(m_CRecv[i]);
 	}
+#endif
 	SAFE_DELETE(m_comm);
 }

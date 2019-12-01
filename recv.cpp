@@ -7,8 +7,6 @@ extern char __BUILD_NUMBER;
 #define MAX_NUM_bitstream 4
 #define MAX_frame_size 1024 * 1024 // 1MB
 
-using namespace std;
-
 CRecv::CRecv(void)
 {
 	m_bExit = false;
@@ -21,9 +19,8 @@ CRecv::~CRecv(void)
 
 	_d("[RECV.ch%d] Trying to exit thread\n", m_nChannel);
 	Terminate();
-	_d("[RECV.ch%d] exited...\n", m_nChannel);
-
 	Delete();
+	_d("[RECV.ch%d] exited...\n", m_nChannel);
 
 	pthread_mutex_destroy(&m_mutex_recv);
 }
@@ -38,6 +35,13 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_nChannel = nChannel;
 	m_attr = attr;
 	m_file_idx = 0;
+
+	m_queue = new CQueue();
+	m_mux = new CMux();
+	m_queue->Enable();
+	m_mux->SetQueue(&m_queue, m_nChannel);
+	m_mux->Create(info, attr, m_nChannel);
+
 	//pthread_mutex_lock(&m_mutex_recv);
 	Start();
 	//pthread_mutex_unlock(&m_mutex_recv);
@@ -46,10 +50,8 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 
 void CRecv::Run()
 {
-	m_pMuxer = new CTSMuxer();
-	m_pPktPool = new CMyPacketPool();
 
-#if 1
+#if 0
 	cout << "[ch." << m_nChannel << "] : " << m_info["ip"].asString() << endl;
 	cout << "[ch." << m_nChannel << "] : " << m_info["port"].asInt() << endl;
 	cout << "[ch." << m_nChannel << "] : " << m_info["fps"].asDouble() << endl;
@@ -68,15 +70,12 @@ void CRecv::Run()
 		}
 	}
 	//_d("[RECV.ch%d] thread exit\n", m_nChannel);
-	SAFE_DELETE(m_pMuxer);
-	SAFE_DELETE(m_pPktPool);
 }
 
 bool CRecv::Receive()
 {
 	unsigned char buff_rcv[PACKET_SIZE + 16];
 	unsigned char frame_buf[MAX_frame_size];
-	int sock;
 	int rd;
 	int fd = 0;
 	int state;
@@ -92,15 +91,6 @@ bool CRecv::Receive()
 	memset(&mux_cfg, 0x00, sizeof(mux_cfg_s));
 	memset(&frame_buf, 0x00, sizeof(&frame_buf));
 
-#if 0
-	struct sockaddr_in server_addr;
-	memset(&server_addr, 0, sizeof(server_addr));
-	server_addr.sin_family = AF_INET;
-	//server_addr.sin_port = htons(19262);
-	server_addr.sin_port = htons(m_info["port"].asInt());
-	server_addr.sin_addr.s_addr = inet_addr(m_info["ip"].asString().c_str());
-#endif
-
 	struct sockaddr_in mcast_group;
 	struct ip_mreq mreq;
 
@@ -109,21 +99,21 @@ bool CRecv::Receive()
 	mcast_group.sin_port = htons(m_info["port"].asInt());
 	mcast_group.sin_addr.s_addr = inet_addr(m_info["ip"].asString().c_str());
 
-	sock = socket(AF_INET, SOCK_DGRAM, 0);
-	if (-1 == sock)
+	m_sock = socket(AF_INET, SOCK_DGRAM, 0);
+	if (-1 == m_sock)
 	{
 		_d("[RECV.ch.%d] socket creation error\n", m_nChannel);
 		return false;
 	}
 
-	if (-1 == bind(sock, (struct sockaddr *)&mcast_group, sizeof(mcast_group)))
+	if (-1 == bind(m_sock, (struct sockaddr *)&mcast_group, sizeof(mcast_group)))
 	{
-		perror("RECV] bind error");
+		perror("[RECV] bind error");
 		return false;
 	}
 
 	uint reuse = 1;
-	state = setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
+	state = setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 	if (state < 0)
 	{
 		perror("[RECV] Setting SO_REUSEADDR error\n");
@@ -133,7 +123,7 @@ bool CRecv::Receive()
 	mreq.imr_multiaddr = mcast_group.sin_addr;
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 
-	if (setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
+	if (setsockopt(m_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
 	{
 		perror("[RECV] add membership setsocket opt");
 		return false;
@@ -142,14 +132,14 @@ bool CRecv::Receive()
 	struct timeval read_timeout;
 	read_timeout.tv_sec = 1;
 	read_timeout.tv_usec = 0;
-	if (setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, &read_timeout, sizeof(read_timeout)) < 0)
+	if (setsockopt(m_sock, SOL_SOCKET, SO_RCVTIMEO, &read_timeout, sizeof(read_timeout)) < 0)
 	{
 		perror("[RECV] set timeout error");
 		return false;
 	}
 
 #if 0
-	state = setsockopt(sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *)&join_addr, sizeof(join_addr));
+	state = setsockopt(m_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *)&join_addr, sizeof(join_addr));
 	if (state < 0)
 	{
 		_d("[RECV.ch.%d] Setting IP_ADD_MEMBERSHIP error : %d\n", m_nChannel, state);
@@ -160,29 +150,10 @@ bool CRecv::Receive()
 	_d("fd : %d\n", fd);
 #endif
 
-	string sub_dir_name = get_current_time_and_date();
-	stringstream sstm;
-	sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel;
-	system(sstm.str().c_str());
-	// clear method is not working
-	sstm.str("");
-
-	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".mp4";
-	m_filename = sstm.str();
-	cout << "[RECV.ch." << m_nChannel << "] expected output file name : " << m_filename << endl;
-
-	mux_cfg.output = 1;
-	mux_cfg.vid.codec = m_attr["codec"].asInt(); // 0 : H264, 1 : HEVC
-	mux_cfg.vid.bitrate = 6000000;
-	mux_cfg.vid.fps = m_info["fps"].asDouble();
-	mux_cfg.vid.width = 720;
-	mux_cfg.vid.height = 480;
-	m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg);
-
 	while (!m_bExit)
 	{
 		/* code */
-		rd = recvfrom(sock, buff_rcv, PACKET_SIZE + 16, 0, NULL, 0);
+		rd = recvfrom(m_sock, buff_rcv, PACKET_SIZE + 16, 0, NULL, 0);
 #if __DEBUG
 		_d("rd : %d\n", rd);
 #endif
@@ -237,42 +208,13 @@ bool CRecv::Receive()
 			pPkt->data = frame_buf;
 			pPkt->size = recv_nestedStreamSize;
 			//pPkt->pts = 1000;
-
+#if 0
 			m_pMuxer->put_data(pPkt);
+#endif
+
+			m_queue->Put(pPkt);
 			av_packet_free(&pPkt);
 
-			m_nRecSec = m_attr["rec_sec"].asInt();
-
-			if (m_nRecSec > 0)
-			{
-				m_nFrameCount++;
-#if __DEBUG
-				_d("current frame : %d\n", m_nFrameCount);
-#endif
-
-				int nDstFrame = (m_nRecSec + 1) * mux_cfg.vid.fps;
-				if (m_nFrameCount >= nDstFrame)
-				{
-					m_nFrameCount = 0;
-
-					cout << "[RECV.ch." << m_nChannel << "] " << m_filename << " mux completed" << endl;
-
-					SAFE_DELETE(m_pMuxer);
-					m_pMuxer = new CTSMuxer();
-
-					m_file_idx++;
-					sstm.str("");
-					sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".mp4";
-					m_filename = sstm.str();
-					m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg);
-				}
-			}
-
-#if DUMPSTREAM
-			write(fd, frame_buf, recv_nestedStreamSize);
-#endif
-
-			memset(&frame_buf, 0x00, sizeof(&frame_buf));
 			recv_nestedStreamSize = 0;
 			nPrevPacketNum = 0;
 		}
@@ -287,7 +229,7 @@ bool CRecv::Receive()
 	return true;
 }
 
-/*
+#if 0
 bool CRecv::send_bitstream(uint8_t *stream, int size) {
 	int tot_packet = 0;
 	int cur_packet = 1;
@@ -342,30 +284,14 @@ bool CRecv::send_bitstream(uint8_t *stream, int size) {
 
 	return true;
 }
-*/
+#endif
 
 void CRecv::Delete()
 {
-	/*
-	char mname[64];
-	char sname[64];
-
-	if (m_shared.pc) {
-		munmap(m_shared.pc, sizeof(channel_s));
-	}
-	if (shm_unlink(m_strShmPrefix) != 0) {
-		_d("[IPC.ch%d] Failed to unlink\n", m_nChannel);
-	}
-	if (sem_close(m_shared.cmd.mutex) < 0) {
-		_d("[IPC.ch%d] Failed to close sem(aud mutex)\n", m_nChannel);
-	}
-	if (sem_close(m_shared.cmd.signal) < 0) {
-		_d("[IPC.ch%d] Failed to close sem(aud signal)\n", m_nChannel);
-	}
-	sprintf(mname, "%s_cmd_mutex", m_strShmPrefix);
-	sprintf(sname, "%s_cmd_signal", m_strShmPrefix);
-
-	sem_unlink(mname);
-	sem_unlink(sname);
-	*/
+	close(m_sock);
+	//SAFE_DELETE(m_pMuxer);
+	SAFE_DELETE(m_queue);
+#if __DEBUG
+	cout << "sock " << m_sock << " closed" << endl;
+#endif
 }

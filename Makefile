@@ -18,7 +18,7 @@ CONFIG = release
 
 BUILD_DIR = ./Build/$(CONFIG)
 INSTALL_DIR = /opt/tnmtech
-TARGET = $(BUILD_DIR)/tmuxer
+TARGET = $(BUILD_DIR)/tmuxer-cmd
 
 # find arg from input
 ifneq "$(findstring clean, $(MAKECMDGOALS))" ""
@@ -93,6 +93,8 @@ GROUP.01.SRC = main.cpp\
 			core.cpp\
 			comm.cpp\
 			recv.cpp\
+			queue.cpp\
+			mux.cpp\
 			tsmuxer.cpp\
 			tspes.cpp\
 			videoglobal.cpp\

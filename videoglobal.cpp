@@ -170,12 +170,14 @@ int CMyRing::Write(uint8_t *buf, int buf_size)
 }
 #endif
 
-CMyPacketPool::CMyPacketPool() {
+CMyPacketPool::CMyPacketPool()
+{
 	/*for (int i = 0; i < MAX_NUM_OF_PACKETS; i++) {
 		m_pPkt[i] = &m_pkt[i];
 	}*/
 
-	for (int i = 0; i < MAX_NUM_OF_PACKETS; i++) {
+	for (int i = 0; i < MAX_NUM_OF_PACKETS; i++)
+	{
 		m_pPkt[i] = NULL;
 	}
 
@@ -184,53 +186,63 @@ CMyPacketPool::CMyPacketPool() {
 	m_nRemain = MAX_NUM_OF_PACKETS;
 }
 
-CMyPacketPool::~CMyPacketPool() {
-	for (int i = 0; i < MAX_NUM_OF_PACKETS; i++) {
-		if (m_pPkt[i]) {
+CMyPacketPool::~CMyPacketPool()
+{
+	for (int i = 0; i < MAX_NUM_OF_PACKETS; i++)
+	{
+		if (m_pPkt[i])
+		{
 			av_packet_free(&m_pPkt[i]);
 		}
 	}
 }
 
-bool CMyPacketPool::Put(char *pData, int nSize, int64_t nTime) {
-	if (m_pPkt[m_nWrite]) {
+bool CMyPacketPool::Put(char *pData, int nSize, int64_t nTime)
+{
+	if (m_pPkt[m_nWrite])
+	{
 		return false;
 	}
 
 	AVPacket *pkt = av_packet_alloc();
-	if (!pkt) {
+	if (!pkt)
+	{
 		return false;
 	}
 
-	pkt->data = (u_int8_t*)pData;
+	pkt->data = (u_int8_t *)pData;
 	pkt->size = nSize;
 	pkt->pts = nTime;
 
 	m_pPkt[m_nWrite] = pkt;
 	m_nWrite++;
 
-	if (m_nWrite >= MAX_NUM_OF_PACKETS) {
+	if (m_nWrite >= MAX_NUM_OF_PACKETS)
+	{
 		m_nWrite = 0;
 	}
 
 	return true;
 }
 
-AVPacket *CMyPacketPool::Get() {
-	if (!m_pPkt[m_nRead]) {
+AVPacket *CMyPacketPool::Get()
+{
+	if (!m_pPkt[m_nRead])
+	{
 		return NULL;
 	}
 
 	AVPacket *pkt = m_pPkt[m_nRead];
-	
+
 	m_pPkt[m_nRead] = NULL;
 	m_nRead++;
-	
-	if (m_nRead >= MAX_NUM_OF_PACKETS) {
+
+	if (m_nRead >= MAX_NUM_OF_PACKETS)
+	{
 		m_nRead = 0;
 	}
 
-	return pkt;	
+	return pkt;
 
 	/*AVPacket *pp = NULL;
 
@@ -246,9 +258,12 @@ AVPacket *CMyPacketPool::Get() {
 	return NULL;*/
 }
 
-void CMyPacketPool::Ret(AVPacket *pp) {
-	for (int i = 0; i < MAX_NUM_OF_PACKETS; i++) {
-		if (!m_pPkt[i]) {
+void CMyPacketPool::Ret(AVPacket *pp)
+{
+	for (int i = 0; i < MAX_NUM_OF_PACKETS; i++)
+	{
+		if (!m_pPkt[i])
+		{
 			m_pPkt[i] = pp;
 			break;
 		}

@@ -2,8 +2,10 @@
 #define _COMM_H_
 
 #include "main.h"
+#include "recv.h"
 
 #define MAX_NUM_SIM_CLIENT 64
+#define MAX_NUM_CHANNEL 6
 
 class CCommBase // Class for comm. module base
 {
@@ -48,15 +50,21 @@ public:
     CCommMgr();
     ~CCommMgr();
 
-    bool Open(int nPort);
+    bool Open(int nPort, Json::Value attr);
+    bool SetQueue(CQueue *queue);
 
 protected:
     void Run();
     void OnTerminate(){};
+    void Delete();
 
 protected:
     int m_nPort;
     int m_sdListen;
+    int m_nChannel;
+    bool m_bIsRunning;
+    Json::Value m_attr;
+    CRecv *m_CRecv[MAX_NUM_CHANNEL];
 
 protected:
     //CCommCt *m_pCt[MAX_NUM_SIM_CLIENT];
