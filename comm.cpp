@@ -47,19 +47,18 @@ void CCommMgr::Run()
 
     socklen_t sin_size = sizeof(sin);
 
-    cout << "udp ready port : " << m_nPort << endl;
+    cout << "[COMM] udp port ready : " << m_nPort << endl;
 
     while (!m_bExit)
     {
         recvfrom(m_sdListen, buff, 4, 0, (struct sockaddr *)&sin, &sin_size);
-        //_d("%c %c %c %c\n", buff[0], buff[1], buff[2], buff[3]);
-        if (buff[0] == 't' && buff[1] == 'n')
+        _d("%c %c %x %x\n", buff[0], buff[1], buff[2], buff[3]);
+        if (buff[0] == 'T' && buff[1] == 'N')
         {
-            if (buff[2] == '0')
+            if (buff[2] == 0x00)
             {
-                if (buff[3] == '1')
+                if (buff[3] == 0x01)
                 {
-                    _d("tn01 실행\n");
                     if (!m_bIsRunning)
                     {
                         m_bIsRunning = true;
@@ -72,22 +71,21 @@ void CCommMgr::Run()
                     }
                     else
                     {
-                        cout << "실행 중" << endl;
+                        cout << "[COMM] 실행 중" << endl;
                     }
                 }
-                else if (buff[3] == '2')
+                else if (buff[3] == 0x02)
                 {
-                    _d("tn02 실행\n");
                     if (m_bIsRunning)
                     {
                         Delete();
-                        _d("muxing 종료\n");
+                        _d("[COMM] muxing 종료\n");
                         m_nChannel = 0;
                         m_bIsRunning = false;
                     }
                     else
                     {
-                        _d("실행 중이 아닙니다.\n");
+                        _d("[COMM] 실행 중이 아닙니다.\n");
                     }
                 }
             }
