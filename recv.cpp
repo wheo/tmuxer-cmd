@@ -36,12 +36,15 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_attr = attr;
 	m_file_idx = 0;
 
-    if ( !SetSocket() ) {
-        cout << "[RECV] SetSocket() is failed" << endl;
-        return false;
-    } else {
-        cout << "[RECV] SetSocket() is succeed" << endl;
-    }
+	if (!SetSocket())
+	{
+		cout << "[RECV] SetSocket() is failed" << endl;
+		return false;
+	}
+	else
+	{
+		cout << "[RECV] SetSocket() is succeed" << endl;
+	}
 
 	m_queue = new CQueue();
 	m_queue->SetChannel(m_nChannel);
@@ -70,7 +73,8 @@ void CRecv::Run()
 	//_d("[RECV.ch%d] thread exit\n", m_nChannel);
 }
 
-bool CRecv::SetSocket() {
+bool CRecv::SetSocket()
+{
 	struct sockaddr_in mcast_group;
 	struct ip_mreq mreq;
 
@@ -119,7 +123,7 @@ bool CRecv::SetSocket() {
 		perror("[RECV] set timeout error");
 		return false;
 	}
-    return true;
+	return true;
 }
 
 bool CRecv::Receive()
@@ -152,7 +156,7 @@ bool CRecv::Receive()
 
 		if (rd < 1)
 		{
-            usleep(100);
+			usleep(10);
 			continue;
 		}
 
@@ -201,10 +205,6 @@ bool CRecv::Receive()
 			pPkt->data = frame_buf;
 			pPkt->size = recv_nestedStreamSize;
 			//pPkt->pts = 1000;
-#if 0
-			m_pMuxer->put_data(pPkt);
-#endif
-
 			m_queue->Put(pPkt);
 			av_packet_free(&pPkt);
 
@@ -215,15 +215,15 @@ bool CRecv::Receive()
 		//_d("write completed : %d(%d)\n", rd, fd);
 		//write(fd, buff_rcv, 16);
 	}
-    cout << "[RECV] thread loop out" << endl;
+	//cout << "[RECV] thread loop out" << endl;
 	return true;
 }
 
 void CRecv::Delete()
 {
 	close(m_sock);
-    SAFE_DELETE(m_mux);
-    SAFE_DELETE(m_queue);
+	SAFE_DELETE(m_mux);
+	SAFE_DELETE(m_queue);
 #if __DEBUG
 	cout << "sock " << m_sock << " closed" << endl;
 #endif

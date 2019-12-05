@@ -14,16 +14,19 @@ CCommMgr::~CCommMgr()
     m_bExit = true;
     Delete();
     pthread_mutex_destroy(&m_mutex_comm);
-    if ( m_sdRecv > 0 ) {
+    if (m_sdRecv > 0)
+    {
         close(m_sdRecv);
     }
-    if ( m_sdSend > 0 ) {
+    if (m_sdSend > 0)
+    {
         close(m_sdSend);
     }
-    SAFE_DELETE(m_RecvBuf);
+    SAFE_DELETE_ARRAY(m_RecvBuf);
 }
 
-bool CCommMgr::SetSocket() {
+bool CCommMgr::SetSocket()
+{
     int t = 1;
     struct sockaddr_in sin;
 
@@ -46,7 +49,8 @@ bool CCommMgr::SetSocket() {
     }
 
     m_sdSend = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
-    if ( m_sdSend < 0 ) {
+    if (m_sdSend < 0)
+    {
         _d("[COMM] failed to open tx socket\n");
     }
 
@@ -66,7 +70,8 @@ bool CCommMgr::Open(int nPort, Json::Value attr)
     return true;
 }
 
-bool CCommMgr::ReadBuffer() {
+bool CCommMgr::ReadBuffer()
+{
     // memcpy(&m_sin, &sin, sizeof(sin));
     char *buff = m_RecvBuf;
     mux_cfg_s *mux_cfg;
@@ -91,12 +96,16 @@ bool CCommMgr::ReadBuffer() {
                     nBuffSize += 5;
 
                     char *pData = &buff[5];
-                    for (int i=0;i < MAX_VIDEO_CHANNEL_COUNT; i++) {
+                    for (int i = 0; i < MAX_VIDEO_CHANNEL_COUNT; i++)
+                    {
                         memcpy(pData, &mux_cfg[i], nStructSize);
                         pData += nStructSize;
                         nBuffSize += nStructSize;
                     }
-                    char strName[260] = {0,};
+                    //windows FILE_MAX_SIZE : 260
+                    char strName[260] = {
+                        0,
+                    };
                     memcpy(strName, pData, sizeof(strName));
                     nBuffSize += sizeof(strName);
 
@@ -104,44 +113,55 @@ bool CCommMgr::ReadBuffer() {
 
                     int json_channel_info;
                     json_channel_info = m_nChannel;
+                    Json::Value root;
+                    Json::Value info;
 
                     for (auto &value : m_attr["channels"])
                     {
-                        if (strlen (strName) > 0 ) {
+                        if (strlen(strName) > 0)
+                        {
                             m_attr["folder_name"] = strName;
-                        } else {
+                        }
+                        else
+                        {
                             m_attr["folder_name"] = get_current_time_and_date();
                         }
                         int bit_state = 0;
                         int result = 0;
 
-                        if ( buff[4] > 0 ) {
+                        if (buff[4] > 0)
+                        {
                             m_attr["bit_state"] = buff[4];
                             bit_state = m_attr["bit_state"].asInt();
                             result = bit_state & (1 << m_nChannel);
                         }
                         m_CRecv[m_nChannel] = new CRecv();
-                        if (m_CRecv[m_nChannel]->Create(m_attr["channels"][m_nChannel], m_attr, m_nChannel) ) {
+                        if (m_CRecv[m_nChannel]->Create(m_attr["channels"][m_nChannel], m_attr, m_nChannel))
+                        {
                             cout << "[COMM] Recv(" << m_nChannel << ") thread is created" << endl;
-                        } else {
+                        }
+                        else
+                        {
                             cout << "[COMM] Recv(" << m_nChannel << ") thread is failed" << endl;
                         }
-                        if ( result > 0 ) {
-                            m_attr["channel_info"].append(m_nChannel);
+                        if (result > 0 || bit_state == 0) // bit_state 0 is all
+                        {
+                            info.append(m_nChannel);
                         }
                         m_nChannel++;
                     }
 
-                    sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString() << "/" << m_nChannel;
+                    sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString();
                     system(sstm.str().c_str());
                     sstm.str("");
 
-                    sstm << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString() << "/" << "info.json";
+                    root["channels"] = info;
 
-                    Json::Value info;
-                    info["channel_info"] = m_attr["channel_info"];
-                    CreateMetaJson(info, sstm.str());
+                    sstm << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString() << "/"
+                         << "info.json";
+                    CreateMetaJson(root, sstm.str());
                     sstm.str("");
+                    //cout << "[COMM] All Recv thrad is created" << endl;
                 }
                 else
                 {
@@ -153,7 +173,7 @@ bool CCommMgr::ReadBuffer() {
                 if (m_bIsRunning)
                 {
                     Delete();
-                    _d("[COMM] muxing 종료\n");
+                    _d("[COMM] muxing completed\n");
                     m_nChannel = 0;
                     m_bIsRunning = false;
                 }
@@ -170,12 +190,13 @@ bool CCommMgr::ReadBuffer() {
     }
 }
 
-bool CCommMgr::RX() {
+bool CCommMgr::RX()
+{
     char buff[READ_SIZE];
 
     struct sockaddr_in sin;
-    int rd_size=0;
-    m_rd_length=0;
+    int rd_size = 0;
+    m_rd_length = 0;
 
     socklen_t sin_size = sizeof(sin);
 
@@ -192,8 +213,10 @@ bool CCommMgr::RX() {
     _d("[COMM] exit loop\n");
 }
 
-bool CCommMgr::TX(char *buff) {
-    if ( m_sdSend < 0 ) {
+bool CCommMgr::TX(char *buff)
+{
+    if (m_sdSend < 0)
+    {
         cout << "[COMM] send socket not created" << endl;
         return false;
     }

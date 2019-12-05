@@ -34,7 +34,7 @@ bool CMux::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_nChannel = nChannel;
 	m_attr = attr;
 	m_file_idx = 0;
-    m_type = info["type"].asString();
+	m_type = info["type"].asString();
 
 	m_pMuxer = new CTSMuxer();
 	if (m_queue)
@@ -54,7 +54,7 @@ bool CMux::SetQueue(CQueue **queue, int nChannel)
 {
 	m_queue = *queue;
 	m_nChannel = nChannel;
-    return EXIT_SUCCESS;
+	return EXIT_SUCCESS;
 }
 
 void CMux::Run()
@@ -64,57 +64,62 @@ void CMux::Run()
 		if (!Muxing())
 		{
 			//error
-            break;
+			break;
 		}
 		else
 		{
-            //success
+			//success
 		}
 	}
 }
-
 
 bool CMux::Muxing()
 {
 	mux_cfg_s mux_cfg;
 	memset(&mux_cfg, 0x00, sizeof(mux_cfg_s));
 
-    int bit_state = m_attr["bit_state"].asInt();
-    int result = bit_state & (1 << m_nChannel);
+	int bit_state = m_attr["bit_state"].asInt();
+	int result = bit_state & (1 << m_nChannel);
 
 	string sub_dir_name;
-    string group_name;
+	string group_name;
 
-    if ( m_attr["folder_name"].asString().size() > 0 ) {
-        sub_dir_name = m_attr["folder_name"].asString();
-    } else {
-        sub_dir_name = "error";
-    }
-    if ( m_attr["bit_state"].asString().size() > 0 ) {
-        cout << "channel : " << m_nChannel << ", bit state is " << bit_state << ", result : " << result << endl;
-        if ( result < 1 ) {
-            cout << "channel " << m_nChannel << " is not use anymore" << endl;
-            return false;
-        }
-    }
+	if (m_attr["folder_name"].asString().size() > 0)
+	{
+		sub_dir_name = m_attr["folder_name"].asString();
+	}
+	else
+	{
+		sub_dir_name = "error";
+	}
+	if (m_attr["bit_state"].asString().size() > 0)
+	{
+		cout << "channel : " << m_nChannel << ", bit state is " << bit_state << ", result : " << result << endl;
+		if (result < 1)
+		{
+			cout << "channel " << m_nChannel << " is not use anymore" << endl;
+			return false;
+		}
+	}
 	stringstream sstm;
 	sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel;
 	system(sstm.str().c_str());
 	// clear method is not working then .str("") correct
 	sstm.str("");
 
-	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << "meta.json";
-    group_name = sstm.str();
-    sstm.str("");
+	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/"
+		 << "meta.json";
+	group_name = sstm.str();
+	sstm.str("");
 
 	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".mp4";
 	m_filename = sstm.str();
 	cout << "[MUX.ch." << m_nChannel << "] expected output file name : " << m_filename << endl;
-    sstm.str("");
+	sstm.str("");
 
 #if __DUMP
 	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".es";
-    m_es_name = sstm.str();
+	m_es_name = sstm.str();
 #endif
 
 	mux_cfg.output = 1;
@@ -124,43 +129,46 @@ bool CMux::Muxing()
 	mux_cfg.vid.width = m_info["width"].asInt();
 	mux_cfg.vid.height = m_info["height"].asInt();
 
-    Json::Value meta;
+	Json::Value meta;
 
-    meta["codec"] = mux_cfg.vid.codec;
-    meta["fps"] = mux_cfg.vid.fps;
-    meta["width"] = mux_cfg.vid.width;
-    meta["height"] = mux_cfg.vid.height;
-    meta["type"] = m_type;
+	meta["codec"] = mux_cfg.vid.codec;
+	meta["fps"] = mux_cfg.vid.fps;
+	meta["width"] = mux_cfg.vid.width;
+	meta["height"] = mux_cfg.vid.height;
+	meta["type"] = m_type;
 
-    CreateMetaJson(meta, group_name);
+	CreateMetaJson(meta, group_name);
 
-    if ( m_type == "video" ) {
-        m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg);
-    }
+	if (m_type == "video")
+	{
+		m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg);
+	}
 
+	string channel;
 #if __DUMP
-    string channel;
-    FILE *es = fopen(m_es_name.c_str(), "wb");
+	FILE *es = fopen(m_es_name.c_str(), "wb");
 #endif
+
+	m_nRecSec = m_attr["rec_sec"].asInt();
 
 	while (!m_bExit)
 	{
-		m_nRecSec = m_attr["rec_sec"].asInt();
 		AVPacket pPkt;
 		if (m_queue->Get(&pPkt) > 0)
 		{
 #if __DUMP
-            fwrite(pPkt.data, 1, pPkt.size, es);
+			fwrite(pPkt.data, 1, pPkt.size, es);
 #endif
-            if ( m_type == "video" ) {
-                m_pMuxer->put_data(&pPkt);
-            }
+			if (m_type == "video")
+			{
+				m_pMuxer->put_data(&pPkt);
+			}
 			m_queue->Ret(&pPkt);
 		}
 		else
 		{
-			cout << "[CMUX.ch" << m_nChannel << "] queue size is 0" << endl;
-			usleep(50000);
+			//cout << "[CMUX.ch" << m_nChannel << "] queue size is 0" << endl;
+			usleep(10);
 			continue;
 		}
 
@@ -171,36 +179,37 @@ bool CMux::Muxing()
 			_d("current frame : %d\n", m_nFrameCount);
 #endif
 			int nDstFrame = (m_nRecSec + 1) * mux_cfg.vid.fps;
+			cout << "dstFrame : " << nDstFrame << endl;
 			if (m_nFrameCount >= nDstFrame)
 			{
 				m_nFrameCount = 0;
 
 				cout << "[MUX.ch." << m_nChannel << "] " << m_filename << " mux completed" << endl;
+				m_file_idx++;
 
-                if ( m_type == "video" ) {
-                    SAFE_DELETE(m_pMuxer);
-                    m_pMuxer = new CTSMuxer();
-
-                    m_file_idx++;
-                    sstm.str("");
-                    sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".mp4";
-                    m_filename = sstm.str();
-                    m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg);
-                }
+				if (m_type == "video")
+				{
+					SAFE_DELETE(m_pMuxer);
+					m_pMuxer = new CTSMuxer();
+					sstm.str("");
+					sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".mp4";
+					m_filename = sstm.str();
+					m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg);
+				}
 #if __DUMP
-                fclose(es);
-                sstm.str("");
+				fclose(es);
+				sstm.str("");
 				sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".es";
-                m_es_name = sstm.str();
-                es = fopen(m_es_name.c_str(), "wb");
+				m_es_name = sstm.str();
+				es = fopen(m_es_name.c_str(), "wb");
 #endif
 			}
 		}
 	}
 #if __DUMP
-    fclose(es);
+	fclose(es);
 #endif
-    cout << "[MUX.ch" << m_nChannel << "] loop out" << endl;
+	//cout << "[MUX.ch" << m_nChannel << "] loop out" << endl;
 	return true;
 }
 

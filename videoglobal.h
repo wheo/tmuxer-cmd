@@ -9,12 +9,7 @@ using namespace chrono;
 #define MAX_HEIGHT 1080
 
 /** some MACROs */
-#define SAFE_DELETE(x) \
-	if (x)             \
-	{                  \
-		delete x;      \
-	};                 \
-	x = NULL;
+
 #define SAFE_RELEASE(x) \
 	if (x)              \
 	{                   \

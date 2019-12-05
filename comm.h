@@ -30,22 +30,6 @@ protected:
     int SS(char *pBuff, int nLen);
 };
 
-class CCommCt : public CCommBase, public PThread
-{
-public:
-    CCommCt();
-    ~CCommCt();
-
-    void Create(int sd, char *pIpAddr);
-
-protected:
-    char m_strIpAddr[32]; // IP address of client
-
-protected:
-    void Run();
-    void OnTerminate(){};
-};
-
 class CCommMgr : public PThread
 {
 public:

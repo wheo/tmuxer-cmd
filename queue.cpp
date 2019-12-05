@@ -20,6 +20,7 @@ CQueue::~CQueue()
 		m_pBuffer = NULL;
 	}
 	pthread_mutex_destroy(&m_mutex);
+	cout << "[QUEUE.ch" << m_nChannel << "] detoryed" << endl;
 }
 
 void CQueue::SetChannel(int nChannel)
@@ -100,14 +101,12 @@ int CQueue::Get(AVPacket *pkt)
 		return NULL;
 	}
 
-	while (true)
-	{
-		pthread_mutex_lock(&m_mutex);
+	pthread_mutex_lock(&m_mutex);
 
-		if (m_pkt[m_nReadPos].size > 0)
-		{
-			av_init_packet(pkt);
-			av_packet_ref(pkt, &m_pkt[m_nReadPos]);
+	if (m_pkt[m_nReadPos].size > 0)
+	{
+		av_init_packet(pkt);
+		av_packet_ref(pkt, &m_pkt[m_nReadPos]);
 #if 0
 			if (m_nPacket < m_nDelay)
 			{
@@ -115,16 +114,20 @@ int CQueue::Get(AVPacket *pkt)
 				return NULL;
 			}
 #endif
-#if __DEBUG
-            _d("[QUEUE.ch%d] get pos ( %d ), size ( %d ), data ( %p ),  type : %d, m_nPacket : %d\n", m_nChannel, m_nReadPos, m_pkt[m_nReadPos].size, m_pkt[m_nReadPos].data, m_pkt[m_nReadPos].stream_index, m_nPacket);
+#if 1
+		_d("[QUEUE.ch%d] get pos ( %d ), size ( %d ), data ( %p ),  type : %d, m_nPacket : %d\n", m_nChannel, m_nReadPos, m_pkt[m_nReadPos].size, m_pkt[m_nReadPos].data, m_pkt[m_nReadPos].stream_index, m_nPacket);
 #endif
-			av_packet_unref(&m_pkt[m_nReadPos]);
-			pthread_mutex_unlock(&m_mutex);
-			return pkt->size;
-		}
+		av_packet_unref(&m_pkt[m_nReadPos]);
 		pthread_mutex_unlock(&m_mutex);
-		//usleep(5);
+		return pkt->size;
 	}
+	else
+	{
+		pthread_mutex_unlock(&m_mutex);
+		return 0;
+	}
+	//pthread_mutex_unlock(&m_mutex);
+	//usleep(5);
 }
 
 void CQueue::Ret(AVPacket *pkt)

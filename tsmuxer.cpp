@@ -394,7 +394,6 @@ void CTSMuxer::DeleteOutput()
 
 	m_bhave_video = false;
 	m_bhave_audio = false;
-    cout << "[TSMUXER] DeleteOutput() called" << endl;
 }
 
 void CTSMuxer::close_stream(AVFormatContext *oc, OutputStream *ost)
