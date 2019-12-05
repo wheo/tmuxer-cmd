@@ -2,6 +2,7 @@
 #define _MISC_H_
 
 std::string get_current_time_and_date();
+bool CreateMetaJson(Json::Value json, string path);
 extern double rnd(double x, int digit);
 
 namespace

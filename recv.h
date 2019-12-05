@@ -16,6 +16,7 @@ public:
 	bool send_bitstream(uint8_t *stream, int size);
 
 	int ReadSocket(uint8_t *buffer, unsigned bufferSize);
+    bool SetSocket();
 	bool Create(Json::Value info, Json::Value attr, int nChannel);
 	void Delete();
 
@@ -31,6 +32,8 @@ protected:
 	char m_strShmPrefix[32];
 	int m_nRead;
 	int m_nWrite;
+
+    string m_type;
 
 	pthread_mutex_t m_mutex_recv;
 

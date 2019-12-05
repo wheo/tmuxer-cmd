@@ -13,7 +13,7 @@ public:
 	CCore(void);
 	~CCore(void);
 
-	bool Create();
+	bool Create(int type);
 	void Delete();
 
 protected:
@@ -23,6 +23,8 @@ private:
 	int m_nChannel;
 	Json::Value m_root;
 	Json::Reader m_reader;
+
+    int m_type;
 
 	CCommMgr *m_comm;
 

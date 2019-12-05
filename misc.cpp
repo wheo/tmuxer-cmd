@@ -17,6 +17,18 @@ std::string get_current_time_and_date()
 	return ss.str();
 }
 
+bool CreateMetaJson(Json::Value json, string path) {
+    //json meta
+    Json::StreamWriterBuilder builder;
+    builder["commentStyle"] = "None";
+    builder["indentation"] ="   "; // tab
+    std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+    std::ofstream ofs (path);
+    writer->write(json, &ofs);
+    ofs.close();
+    cout << "[MISC] Create Json meta completed : " << path << endl;
+}
+
 double rnd(double x, int digit)
 {
 	return (floor((x)*pow(float(10), digit) + 0.5f) / pow(float(10), digit));

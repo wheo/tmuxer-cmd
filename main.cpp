@@ -18,14 +18,6 @@ void sigfunc(int signum)
     pthread_cond_signal(&sleepCond);
 }
 
-static void log_callback(void *ptr, int level, const char *fmt, va_list vl)
-{
-    char szMsg[512] = {0};
-    vsprintf(szMsg, fmt, vl);
-
-    _d("%s\n", szMsg);
-}
-
 int main(int argc, char *argv[])
 {
     struct rlimit rlim;
@@ -39,6 +31,15 @@ int main(int argc, char *argv[])
     rlim.rlim_max = (4096*1024*10);
     setrlimit(RLIMIT_STACK, &rlim);
 #endif
+    if ( argc < 2 ) {
+        cout << "[MAIN] ./tmuxer 0 or 1 ( 0 is 24 hour Rec, 1 is Event Rec)" << endl;
+        exit(0);
+    }
+
+    if ( argv[1][0] != '0' && argv[1][0] != '1' ) {
+        cout << "[MAIN] This program's parametar is only 0 or 1" << endl;
+        exit(0);
+    }
 
     //setting.json check
     ifstream ifs("./setting.json");
@@ -58,8 +59,10 @@ int main(int argc, char *argv[])
     //av_register_all();
     //avfilter_register_all();
     _d("[MAIN] Started...\n");
+
+    int type = atoi(argv[1]);
     CCore *core = new CCore();
-    core->Create();
+    core->Create(type);
 
     while (!exit_flag_main)
     {

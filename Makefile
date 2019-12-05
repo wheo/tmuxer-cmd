@@ -18,7 +18,7 @@ CONFIG = release
 
 BUILD_DIR = ./Build/$(CONFIG)
 INSTALL_DIR = /opt/tnmtech
-TARGET = $(BUILD_DIR)/tmuxer-cmd
+TARGET = $(BUILD_DIR)/tmuxer
 
 # find arg from input
 ifneq "$(findstring clean, $(MAKECMDGOALS))" ""

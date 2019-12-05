@@ -116,10 +116,7 @@ int CQueue::Get(AVPacket *pkt)
 			}
 #endif
 #if __DEBUG
-			if (m_nChannel == 0)
-			{
-				_d("get pos ( %d ), size ( %d ), data ( %p ),  type : %d, m_nPacket : %d\n", m_nReadPos, m_pkt[m_nReadPos].size, m_pkt[m_nReadPos].data, m_pkt[m_nReadPos].stream_index, m_nPacket);
-			}
+            _d("[QUEUE.ch%d] get pos ( %d ), size ( %d ), data ( %p ),  type : %d, m_nPacket : %d\n", m_nChannel, m_nReadPos, m_pkt[m_nReadPos].size, m_pkt[m_nReadPos].data, m_pkt[m_nReadPos].stream_index, m_nPacket);
 #endif
 			av_packet_unref(&m_pkt[m_nReadPos]);
 			pthread_mutex_unlock(&m_mutex);

@@ -18,18 +18,18 @@ CCore::~CCore(void)
 
 	_d("[CORE] Trying to exit thread\n");
 	Terminate();
-	_d("[CORE] exited...\n");
+    //Terminate is Thread Join Completed 
+	_d("[CORE] Exited...\n");
 
 	Delete();
 
 	pthread_mutex_destroy(&m_mutex_core);
 }
 
-bool CCore::Create()
+bool CCore::Create(int type)
 {
-
 	m_nChannel = 0;
-
+    m_type = type;
 	ifstream ifs("./setting.json", ifstream::binary);
 
 	if (!ifs.is_open())
@@ -83,7 +83,7 @@ bool CCore::Create()
 			}
 #endif
 			m_comm = new CCommMgr();
-			m_comm->Open(attr["udp_muxer_port"].asInt(), attr);
+			m_comm->Open(attr["udp_muxer_port"][m_type].asInt(), attr);
 		}
 	}
 

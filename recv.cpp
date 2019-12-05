@@ -18,8 +18,8 @@ CRecv::~CRecv(void)
 	m_bExit = true;
 
 	_d("[RECV.ch%d] Trying to exit thread\n", m_nChannel);
-	Terminate();
 	Delete();
+	Terminate();
 	_d("[RECV.ch%d] exited...\n", m_nChannel);
 
 	pthread_mutex_destroy(&m_mutex_recv);
@@ -36,64 +36,45 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_attr = attr;
 	m_file_idx = 0;
 
+    if ( !SetSocket() ) {
+        cout << "[RECV] SetSocket() is failed" << endl;
+        return false;
+    } else {
+        cout << "[RECV] SetSocket() is succeed" << endl;
+    }
+
 	m_queue = new CQueue();
 	m_queue->SetChannel(m_nChannel);
-	m_mux = new CMux();
 	m_queue->Enable();
+	m_mux = new CMux();
 	m_mux->SetQueue(&m_queue, m_nChannel);
 	m_mux->Create(info, attr, m_nChannel);
 
-	//pthread_mutex_lock(&m_mutex_recv);
 	Start();
-	//pthread_mutex_unlock(&m_mutex_recv);
 	return true;
 }
 
 void CRecv::Run()
 {
-
-#if 0
-	cout << "[ch." << m_nChannel << "] : " << m_info["ip"].asString() << endl;
-	cout << "[ch." << m_nChannel << "] : " << m_info["port"].asInt() << endl;
-	cout << "[ch." << m_nChannel << "] : " << m_info["fps"].asDouble() << endl;
-#endif
-
 	while (!m_bExit)
 	{
 		if (!Receive())
 		{
 			//error
-			// m_bExit = true;
 		}
 		else
 		{
-			// return true
+			// success
 		}
 	}
 	//_d("[RECV.ch%d] thread exit\n", m_nChannel);
 }
 
-bool CRecv::Receive()
-{
-	unsigned char buff_rcv[PACKET_SIZE + 16];
-	unsigned char frame_buf[MAX_frame_size];
-	int rd;
-	int fd = 0;
-	int state;
-	int recv_nTotalStreamSize = 0;
-	int recv_nCurStreamSize = 0;
-	int recv_nestedStreamSize = 0;
-
-	int nTotalPacketNum = 0;
-	int nCurPacketNum = 0;
-	int nPrevPacketNum = 0;
-
-	mux_cfg_s mux_cfg;
-	memset(&mux_cfg, 0x00, sizeof(mux_cfg_s));
-	memset(&frame_buf, 0x00, sizeof(&frame_buf));
-
+bool CRecv::SetSocket() {
 	struct sockaddr_in mcast_group;
 	struct ip_mreq mreq;
+
+	int state;
 
 	memset(&mcast_group, 0x00, sizeof(mcast_group));
 	mcast_group.sin_family = AF_INET;
@@ -138,18 +119,28 @@ bool CRecv::Receive()
 		perror("[RECV] set timeout error");
 		return false;
 	}
+    return true;
+}
+
+bool CRecv::Receive()
+{
+	unsigned char buff_rcv[PACKET_SIZE + 16];
+	unsigned char frame_buf[MAX_frame_size];
+	int rd;
+	int fd = 0;
+	int recv_nTotalStreamSize = 0;
+	int recv_nCurStreamSize = 0;
+	int recv_nestedStreamSize = 0;
+
+	int nTotalPacketNum = 0;
+	int nCurPacketNum = 0;
+	int nPrevPacketNum = 0;
 
 #if 0
-	state = setsockopt(m_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, (void *)&join_addr, sizeof(join_addr));
-	if (state < 0)
-	{
-		_d("[RECV.ch.%d] Setting IP_ADD_MEMBERSHIP error : %d\n", m_nChannel, state);
-	}
+	mux_cfg_s mux_cfg;
+	memset(&mux_cfg, 0x00, sizeof(mux_cfg_s));
 #endif
-#if DUMPSTREAM
-	fd = open("./test.bin", O_WRONLY | O_CREAT | O_TRUNC, 0644);
-	_d("fd : %d\n", fd);
-#endif
+	memset(&frame_buf, 0x00, sizeof(&frame_buf));
 
 	while (!m_bExit)
 	{
@@ -161,6 +152,7 @@ bool CRecv::Receive()
 
 		if (rd < 1)
 		{
+            usleep(100);
 			continue;
 		}
 
@@ -223,75 +215,15 @@ bool CRecv::Receive()
 		//_d("write completed : %d(%d)\n", rd, fd);
 		//write(fd, buff_rcv, 16);
 	}
-#if DUMPSTREAM
-	close(fd);
-#endif
-	//_d("[RECV.ch.%d] exit while completed\n", m_nChannel);
+    cout << "[RECV] thread loop out" << endl;
 	return true;
 }
-
-#if 0
-bool CRecv::send_bitstream(uint8_t *stream, int size) {
-	int tot_packet = 0;
-	int cur_packet = 1;
-
-	int tot_size;
-	int cur_size;
-
-	int remain;
-
-	int nSendto;
-
-	uint8_t *p = stream;
-	uint8_t buffer[PACKET_SIZE + 16];
-
-	tot_size = remain = size;
-
-	if ((tot_size % PACKET_SIZE) == 0) {
-		tot_packet = tot_size/PACKET_SIZE;
-	} else {
-		tot_packet = tot_size/PACKET_SIZE + 1;
-	}
-	while(remain > 0) {
-		if (remain > PACKET_SIZE) {
-			cur_size = PACKET_SIZE;
-		} else {
-			cur_size = remain;
-		}
-
-		memcpy(&buffer[0], &tot_size, 4);
-		memcpy(&buffer[4], &cur_size, 4);
-		memcpy(&buffer[8], &tot_packet, 4);
-		memcpy(&buffer[12], &cur_packet, 4);
-		memcpy(&buffer[16], p, cur_size);
-
-
-		nSendto = sendto(m_socket_fd, buffer, PACKET_SIZE+16, 0, (struct sockaddr *)&m_addr, sizeof(m_addr));
-		if (nSendto < 0)
-		{
-			printf("%s : failed to send\n", __func__);
-			return false;
-		}
-		// else
-		// {
-		// 	printf("sendto(%d)\n", nSendto);
-		// }
-		
-
-		remain -= cur_size;
-		p += cur_size;
-		cur_packet++;
-	}
-
-	return true;
-}
-#endif
 
 void CRecv::Delete()
 {
 	close(m_sock);
-	//SAFE_DELETE(m_pMuxer);
-	//SAFE_DELETE(m_queue);
+    SAFE_DELETE(m_mux);
+    SAFE_DELETE(m_queue);
 #if __DEBUG
 	cout << "sock " << m_sock << " closed" << endl;
 #endif
