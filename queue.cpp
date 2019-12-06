@@ -5,20 +5,16 @@ CQueue::CQueue()
 {
 	m_nMaxQueue = MAX_NUM_QUEUE;
 	m_nSizeQueue = 0;
-	m_pBuffer = NULL;
 
 	m_bEnable = false;
 	m_nPacket = 0;
+
 	pthread_mutex_init(&m_mutex, NULL);
+	cout << "[QUEUE] Contructor" << endl;
 }
 
 CQueue::~CQueue()
 {
-	if (m_pBuffer)
-	{
-		free(m_pBuffer);
-		m_pBuffer = NULL;
-	}
 	pthread_mutex_destroy(&m_mutex);
 	cout << "[QUEUE.ch" << m_nChannel << "] detoryed" << endl;
 }
@@ -67,10 +63,7 @@ int CQueue::Put(AVPacket *pkt)
 			av_packet_ref(&m_pkt[m_nWritePos], pkt);
 			av_packet_unref(pkt);
 #if __DEBUG
-			if (m_nChannel == 0)
-			{
-				_d("put pos : ( %d ), stream_index : %d, data ( %p ), size ( %d )\n", m_nWritePos, pkt->stream_index, m_pkt[m_nWritePos].data, m_pkt[m_nWritePos].size);
-			}
+			_d("put pos : ( %d ), stream_index : %d, data ( %p ), size ( %d )\n", m_nWritePos, pkt->stream_index, m_pkt[m_nWritePos].data, m_pkt[m_nWritePos].size);
 #endif
 			m_nWritePos++;
 			if (m_nWritePos >= m_nMaxQueue)
@@ -105,6 +98,9 @@ int CQueue::Get(AVPacket *pkt)
 
 	if (m_pkt[m_nReadPos].size > 0)
 	{
+#if __DEBUG
+		cout << "[QUEUE.ch" << m_nChannel << "] m_nReadPos : " << m_nReadPos << ", size : " << m_pkt[m_nReadPos].size << endl;
+#endif
 		av_init_packet(pkt);
 		av_packet_ref(pkt, &m_pkt[m_nReadPos]);
 #if 0
@@ -114,7 +110,7 @@ int CQueue::Get(AVPacket *pkt)
 				return NULL;
 			}
 #endif
-#if 1
+#if 0
 		_d("[QUEUE.ch%d] get pos ( %d ), size ( %d ), data ( %p ),  type : %d, m_nPacket : %d\n", m_nChannel, m_nReadPos, m_pkt[m_nReadPos].size, m_pkt[m_nReadPos].data, m_pkt[m_nReadPos].stream_index, m_nPacket);
 #endif
 		av_packet_unref(&m_pkt[m_nReadPos]);

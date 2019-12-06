@@ -3,6 +3,9 @@
         "iomanip": "cpp",
         "ostream": "cpp",
         "string": "cpp",
-        "fstream": "cpp"
+        "fstream": "cpp",
+        "iosfwd": "cpp",
+        "streambuf": "cpp",
+        "tuple": "cpp"
     }    
 }

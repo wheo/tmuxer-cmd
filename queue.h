@@ -1,7 +1,7 @@
 #ifndef _QUEUE_H_
 #define _QUEUE_H_
 
-#define MAX_NUM_QUEUE 512
+#define MAX_NUM_QUEUE 120
 #define QUE_INFINITE -1
 #define MIN_BUF_FRAME 9
 
@@ -34,8 +34,6 @@ private:
 
 	int m_nReadFramePos;
 	int m_nWriteFramePos;
-
-	char *m_pBuffer;
 
 	int m_nChannel;
 

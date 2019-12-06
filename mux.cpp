@@ -71,6 +71,7 @@ void CMux::Run()
 			//success
 		}
 	}
+	cout << "[MUX.ch" << m_nChannel << "] loop out" << endl;
 }
 
 bool CMux::Muxing()
@@ -136,6 +137,8 @@ bool CMux::Muxing()
 	meta["width"] = mux_cfg.vid.width;
 	meta["height"] = mux_cfg.vid.height;
 	meta["type"] = m_type;
+	meta["num"] = m_info["num"].asInt();
+	meta["den"] = m_info["den"].asInt();
 
 	CreateMetaJson(meta, group_name);
 
@@ -179,7 +182,6 @@ bool CMux::Muxing()
 			_d("current frame : %d\n", m_nFrameCount);
 #endif
 			int nDstFrame = (m_nRecSec + 1) * mux_cfg.vid.fps;
-			cout << "dstFrame : " << nDstFrame << endl;
 			if (m_nFrameCount >= nDstFrame)
 			{
 				m_nFrameCount = 0;
@@ -216,6 +218,7 @@ bool CMux::Muxing()
 void CMux::Delete()
 {
 	SAFE_DELETE(m_pMuxer);
+	SAFE_DELETE(m_queue);
 #if __DEBUG
 	cout << "sock " << m_sock << " closed" << endl;
 #endif

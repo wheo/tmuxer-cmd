@@ -98,7 +98,7 @@ bool CCommMgr::ReadBuffer()
                     char *pData = &buff[5];
                     for (int i = 0; i < MAX_VIDEO_CHANNEL_COUNT; i++)
                     {
-                        memcpy(pData, &mux_cfg[i], nStructSize);
+                        //memcpy(pData, &mux_cfg[i], nStructSize);
                         pData += nStructSize;
                         nBuffSize += nStructSize;
                     }
@@ -156,6 +156,7 @@ bool CCommMgr::ReadBuffer()
                     sstm.str("");
 
                     root["channels"] = info;
+                    root["bit_state"] = buff[4];
 
                     sstm << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString() << "/"
                          << "info.json";
@@ -207,6 +208,7 @@ bool CCommMgr::RX()
         rd_size = recvfrom(m_sdRecv, buff, READ_SIZE, 0, (struct sockaddr *)&sin, &sin_size);
         memcpy(m_RecvBuf, buff, rd_size);
         cout << "rd_size : " << rd_size << endl;
+        sendto(m_sdSend, buff, sizeof(buff), 0, (struct sockaddr *)&sin, sin_size);
         //추후 thread 처리
         ReadBuffer();
     }
