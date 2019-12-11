@@ -6,6 +6,10 @@
         "fstream": "cpp",
         "iosfwd": "cpp",
         "streambuf": "cpp",
-        "tuple": "cpp"
+        "tuple": "cpp",
+        "array": "cpp",
+        "initializer_list": "cpp",
+        "chrono": "cpp",
+        "mutex": "cpp"
     }    
 }

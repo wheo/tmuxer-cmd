@@ -2,7 +2,9 @@
 #define _MISC_H_
 
 std::string get_current_time_and_date();
+std::ifstream::pos_type getFilesize(string filename);
 bool CreateMetaJson(Json::Value json, string path);
+bool ModifyOutputJson(string);
 extern double rnd(double x, int digit);
 
 namespace
@@ -86,6 +88,12 @@ typedef struct tagPos
 	struct tagPos *next;
 
 } Pos, *POSITION;
+
+typedef struct tagELEM
+{
+	char *p;
+	int len;
+} ELEM;
 
 class CMyList
 {

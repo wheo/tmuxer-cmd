@@ -47,8 +47,8 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	}
 
 	m_queue = new CQueue();
-	m_queue->SetChannel(m_nChannel);
-	m_queue->Enable();
+	m_queue->SetInfo(m_nChannel, m_info["type"].asString());
+	//m_queue->Enable();
 	m_mux = new CMux();
 	m_mux->SetQueue(&m_queue, m_nChannel);
 	m_mux->Create(info, attr, m_nChannel);
@@ -146,44 +146,46 @@ bool CRecv::Receive()
 #endif
 	memset(&frame_buf, 0x00, sizeof(&frame_buf));
 
+	cout << "[RECV.ch" << m_nChannel << "] type : " << m_info["type"].asString() << endl;
+	if (m_info["type"].asString() == "audio" || m_info["type"].asString() == "video")
+	{
+		m_queue->Enable();
+	}
 	while (!m_bExit)
 	{
 		/* code */
 		rd = recvfrom(m_sock, buff_rcv, PACKET_SIZE + 16, 0, NULL, 0);
 #if __DEBUG
-		_d("rd : %d\n", rd);
+		_d("[RECV.ch%d] rd : %d\n", m_nChannel, rd);
 #endif
-
 		if (rd < 1)
 		{
 			usleep(10);
 			continue;
 		}
-
 		if (m_info["type"].asString() == "audio")
 		{
-			AVPacket *pPkt;
-			pPkt = av_packet_alloc();
-
-			pPkt->data = frame_buf;
-			pPkt->size = recv_nestedStreamSize;
-			//pPkt->pts = 1000;
-			m_queue->Put(pPkt);
-			av_packet_free(&pPkt);
+			void *p;
+			p = buff_rcv;
+			m_queue->PutAudio((char *)p, rd);
 		}
 		else
 		{
+#if 0
+			if (m_info["type"].asString() == "video")
+			{
+				continue;
+			}
+#endif
 			memcpy(&recv_nTotalStreamSize, buff_rcv, 4);
 			memcpy(&recv_nCurStreamSize, buff_rcv + 4, 4);
 			memcpy(&nTotalPacketNum, buff_rcv + 8, 4);
 			memcpy(&nCurPacketNum, buff_rcv + 12, 4);
-
 #if 0
 		for (int i=0;i<16;i++) {
 			_d("offset : %d, mem[%d] : %x\n",i, i, buff_rcv[i] );
 		}
 #endif
-
 			if ((nPrevPacketNum + 1) != nCurPacketNum)
 			{
 #if __DEBUG
@@ -195,23 +197,18 @@ bool CRecv::Receive()
 			//_d("nTotalPacketNum(%d)/nCurPacketNum(%d), recv_nestedStreamSize(%d)\n", nTotalPacketNum, nCurPacketNum, recv_nestedStreamSize);
 			cout << "[RECV.ch." << m_nChannel << "] nTotalPacketNum(" << nTotalPacketNum << "/" << nCurPacketNum << ", " << recv_nestedStreamSize << ")" << endl;
 #endif
-
 			memcpy(frame_buf + recv_nestedStreamSize, buff_rcv + 16, recv_nCurStreamSize);
 			recv_nestedStreamSize += recv_nCurStreamSize;
-
 #if __DEBUG
 			_d("[RECV.ch%d] (%d/%d)\n", m_nChannel, recv_nCurStreamSize, recv_nestedStreamSize);
 #endif
-
 			if (nTotalPacketNum == nCurPacketNum)
 			{
 				// 1 frame 만들어 졌을 때
-
 #if __DEBUG
 				_d("[RECV.ch%d] recv_nTotalStreamSize(%d)/recv_nestedStreamSize(%d)\n", m_nChannel, recv_nTotalStreamSize, recv_nestedStreamSize);
 				_d("[RECV.ch%d] 1 (%d) frame created\n", m_nChannel, recv_nestedStreamSize);
 #endif
-
 				AVPacket *pPkt;
 				pPkt = av_packet_alloc();
 
@@ -225,7 +222,6 @@ bool CRecv::Receive()
 				nPrevPacketNum = 0;
 			}
 		}
-
 		//_d("write completed : %d(%d)\n", rd, fd);
 		//write(fd, buff_rcv, 16);
 	}

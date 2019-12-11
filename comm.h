@@ -46,7 +46,7 @@ protected:
     void Delete();
     bool SetSocket();
     bool RX();
-    bool TX(char *buff);
+    bool TX(char *buff, int size);
 
 protected:
     int m_nPort;

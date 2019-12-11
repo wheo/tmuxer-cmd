@@ -43,6 +43,7 @@ extern "C"
 }
 
 using namespace std;
+using namespace chrono;
 
 #define __DEBUG 0
 #define __DUMP 1

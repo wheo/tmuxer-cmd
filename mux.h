@@ -11,11 +11,13 @@ public:
 	CMux(void);
 	~CMux(void);
 
-	int ReadSocket(uint8_t *buffer, unsigned bufferSize);
+	//int ReadSocket(uint8_t *buffer, unsigned bufferSize);
+	bool SetSocket();
+	bool TX(char *buff, int size);
 	bool Create(Json::Value info, Json::Value attr, int nChannel);
 	void Delete();
 	bool SetQueue(CQueue **queue, int nChannel);
-    
+
 	bool Muxing();
 
 	void log(int type, int state);
@@ -34,14 +36,17 @@ private:
 
 	int m_nRecSec;	 // 얼마나 녹화를 할 것인가
 	int m_nFrameCount; // 프레임 수
+	int m_nAudioCount; // 오디오 수
 	int m_file_idx;	// 파일 인덱스 번호
 	string m_filename;
-    string m_es_name;
-	int m_sock;
+	string m_es_name;
+	string m_audio_name;
+	//int m_sock;
+	int m_sdSend;
 
 	Json::Value json;
 
-    string m_type;
+	string m_type;
 
 	CTSMuxer *m_pMuxer;
 	CQueue *m_queue;

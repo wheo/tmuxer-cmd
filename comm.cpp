@@ -1,7 +1,5 @@
 #include "comm.h"
 
-using namespace std;
-
 CCommMgr::CCommMgr()
 {
     m_bExit = false;
@@ -33,7 +31,7 @@ bool CCommMgr::SetSocket()
     m_sdRecv = socket(PF_INET, SOCK_DGRAM, 0);
     if (m_sdRecv < 0)
     {
-        _d("[COMM] Failed to open rx socket\n");
+        cout << "[COMM] Failed to open rx socket" << endl;
     }
 
     memset(&sin, 0, sizeof(struct sockaddr_in));
@@ -46,15 +44,17 @@ bool CCommMgr::SetSocket()
     if (bind(m_sdRecv, (const sockaddr *)&sin, sizeof(sin)) < 0)
     {
         _d("[COMM] Failed to bind to port %d\n", sin.sin_port);
+        return false;
     }
 
     m_sdSend = socket(PF_INET, SOCK_DGRAM, IPPROTO_IP);
     if (m_sdSend < 0)
     {
         _d("[COMM] failed to open tx socket\n");
+        return false;
     }
 
-    return EXIT_SUCCESS;
+    return true;
 }
 
 bool CCommMgr::Open(int nPort, Json::Value attr)
@@ -64,7 +64,10 @@ bool CCommMgr::Open(int nPort, Json::Value attr)
     m_nPort = nPort;
     m_attr = attr;
 
-    SetSocket();
+    if (!SetSocket())
+    {
+        // failed
+    }
     Start();
 
     return true;
@@ -73,121 +76,111 @@ bool CCommMgr::Open(int nPort, Json::Value attr)
 bool CCommMgr::ReadBuffer()
 {
     // memcpy(&m_sin, &sin, sizeof(sin));
-    char *buff = m_RecvBuf;
+
     mux_cfg_s *mux_cfg;
 
+    Json::Reader reader;
+    Json::Value root;
+    string strbuf;
+    strbuf = (char *)m_RecvBuf;
     stringstream sstm;
-    //memset(mux_cfg, 0x00, sizeof(mux_cfg_s)); // 혹시 segfault 원인?
 
-    _d("%c %c %d %d state : %d\n", buff[0], buff[1], buff[2], buff[3], buff[4]);
-    if (buff[0] == 'T' && buff[1] == 'N')
+    if (reader.parse(strbuf, root, true))
     {
-        if (buff[2] == 0x00)
+        //parse success
+        if (root["cmd"] == "save_start")
         {
-            if (buff[3] == 0x01)
+            if (!m_bIsRunning)
             {
-                if (!m_bIsRunning)
+                m_bIsRunning = true;
+                m_nChannel = 0;
+#if 0
+                int nStructSize = sizeof(mux_cfg_s);
+                int nBuffSize = 0;
+                // buff[4] is enable bit 연산
+                nBuffSize += 5;
+
+                char *pData = &buff[5];
+                for (int i = 0; i < MAX_VIDEO_CHANNEL_COUNT; i++)
                 {
-                    m_bIsRunning = true;
-                    m_nChannel = 0;
-                    int nStructSize = sizeof(mux_cfg_s);
-                    int nBuffSize = 0;
-                    // buff[4] is enable bit 연산
-                    nBuffSize += 5;
-
-                    char *pData = &buff[5];
-                    for (int i = 0; i < MAX_VIDEO_CHANNEL_COUNT; i++)
-                    {
-                        //memcpy(pData, &mux_cfg[i], nStructSize);
-                        pData += nStructSize;
-                        nBuffSize += nStructSize;
-                    }
-                    //windows FILE_MAX_SIZE : 260
-                    char strName[260] = {
-                        0,
-                    };
-                    memcpy(strName, pData, sizeof(strName));
-                    nBuffSize += sizeof(strName);
-
-                    _d("[COMM] received event filename : %s\n", strName);
-
-                    int json_channel_info;
-                    json_channel_info = m_nChannel;
-                    Json::Value root;
-                    Json::Value info;
-
-                    for (auto &value : m_attr["channels"])
-                    {
-                        if (strlen(strName) > 0)
-                        {
-                            m_attr["folder_name"] = strName;
-                        }
-                        else
-                        {
-                            m_attr["folder_name"] = get_current_time_and_date();
-                        }
-                        int bit_state = 0;
-                        int result = 0;
-
-                        if (buff[4] > 0)
-                        {
-                            m_attr["bit_state"] = buff[4];
-                            bit_state = m_attr["bit_state"].asInt();
-                            result = bit_state & (1 << m_nChannel);
-                        }
-                        m_CRecv[m_nChannel] = new CRecv();
-                        if (m_CRecv[m_nChannel]->Create(m_attr["channels"][m_nChannel], m_attr, m_nChannel))
-                        {
-                            cout << "[COMM] Recv(" << m_nChannel << ") thread is created" << endl;
-                        }
-                        else
-                        {
-                            cout << "[COMM] Recv(" << m_nChannel << ") thread is failed" << endl;
-                        }
-                        if (result > 0 || bit_state == 0) // bit_state 0 is all
-                        {
-                            info.append(m_nChannel);
-                        }
-                        m_nChannel++;
-                    }
-
-                    sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString();
-                    system(sstm.str().c_str());
-                    sstm.str("");
-
-                    root["channels"] = info;
-                    root["bit_state"] = buff[4];
-
-                    sstm << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString() << "/"
-                         << "info.json";
-                    CreateMetaJson(root, sstm.str());
-                    sstm.str("");
-                    //cout << "[COMM] All Recv thrad is created" << endl;
+                    //memcpy(pData, &mux_cfg[i], nStructSize);
+                    pData += nStructSize;
+                    nBuffSize += nStructSize;
                 }
-                else
+                //windows FILE_MAX_SIZE : 260
+                char strName[260] = {
+                    0,
+                };
+                memcpy(strName, pData, sizeof(strName));
+                nBuffSize += sizeof(strName);
+                _d("[COMM] received event filename : %s\n", strName);
+#endif
+                int bit_state = 0;
+                int result = 0;
+
+                for (auto &value : m_attr["channels"])
                 {
-                    cout << "[COMM] Running...." << endl;
+                    //cout << "file_name : " << root["info"]["file_name"].asString() << endl;
+                    if (!root["info"]["file_name"].isNull())
+                    {
+                        m_attr["folder_name"] = root["info"]["file_name"].asString();
+                    }
+                    else
+                    {
+                        m_attr["folder_name"] = get_current_time_and_date();
+                    }
+                    if (root["info"]["bit_state"].asInt() > 0)
+                    {
+                        //bit_state = m_attr["bit_state"].asInt();
+                        bit_state = root["info"]["bit_state"].asInt();
+                        result = bit_state & (1 << m_nChannel);
+                    }
+                    m_CRecv[m_nChannel] = new CRecv();
+                    if (m_CRecv[m_nChannel]->Create(m_attr["channels"][m_nChannel], m_attr, m_nChannel))
+                    {
+                        cout << "[COMM] Recv(" << m_nChannel << ") thread is created" << endl;
+                    }
+                    else
+                    {
+                        cout << "[COMM] Recv(" << m_nChannel << ") thread is failed" << endl;
+                    }
+                    m_nChannel++;
                 }
+
+                sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString();
+                system(sstm.str().c_str());
+                sstm.str("");
+
+                root["time"] = get_current_time_and_date();
+
+                sstm << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString() << "/"
+                     << "info.json";
+                CreateMetaJson(root, sstm.str());
+                sstm.str("");
             }
-            else if (buff[3] == 0x02)
+            else
             {
-                if (m_bIsRunning)
-                {
-                    Delete();
-                    _d("[COMM] muxing completed\n");
-                    m_nChannel = 0;
-                    m_bIsRunning = false;
-                }
-                else
-                {
-                    cout << "[COMM] Service is not running" << endl;
-                }
+                cout << "[COMM] Service is running" << endl;
+            }
+        }
+        else if (root["cmd"] == "save_stop")
+        {
+            if (m_bIsRunning)
+            {
+                Delete();
+                _d("[COMM] muxing completed\n");
+                m_nChannel = 0;
+                m_bIsRunning = false;
+            }
+            else
+            {
+                cout << "[COMM] Service is not running" << endl;
             }
         }
     }
     else
     {
-        _d("[COMM] Unknown sync code...%c %c %c %c\n", buff[0], buff[1], buff[2], buff[3]);
+        cout << "[COMM] message is json" << endl;
     }
 }
 
@@ -205,17 +198,19 @@ bool CCommMgr::RX()
 
     while (!m_bExit)
     {
+        memset(buff, 0x00, 0);
         rd_size = recvfrom(m_sdRecv, buff, READ_SIZE, 0, (struct sockaddr *)&sin, &sin_size);
         memcpy(m_RecvBuf, buff, rd_size);
-        cout << "rd_size : " << rd_size << endl;
-        sendto(m_sdSend, buff, sizeof(buff), 0, (struct sockaddr *)&sin, sin_size);
+        //cout << "[COMM] rd_size : " << rd_size << endl;
+        //sendto(m_sdSend, buff, sizeof(buff), 0, (struct sockaddr *)&sin, sin_size);
+        TX(buff, rd_size);
         //추후 thread 처리
         ReadBuffer();
     }
     _d("[COMM] exit loop\n");
 }
 
-bool CCommMgr::TX(char *buff)
+bool CCommMgr::TX(char *buff, int size)
 {
     if (m_sdSend < 0)
     {
@@ -227,11 +222,11 @@ bool CCommMgr::TX(char *buff)
     socklen_t sin_size = sizeof(sin);
 
     sin.sin_family = AF_INET;
-    sin.sin_addr.s_addr = inet_addr(m_attr["uep_muxer_ip"].asString().c_str());
-    sin.sin_port = m_nPort;
+    sin.sin_addr.s_addr = inet_addr(m_attr["udp_target_ip"].asString().c_str());
+    sin.sin_port = htons(m_attr["udp_target_port"].asInt());
 
-    sendto(m_sdRecv, buff, sizeof(buff), 0, (struct sockaddr *)&sin, sin_size);
-    cout << "ip : " << inet_ntoa(sin.sin_addr) << " send message : " << buff[0] << buff[1] << buff[2] << buff[3] << endl;
+    sendto(m_sdSend, buff, size, 0, (struct sockaddr *)&sin, sin_size);
+    cout << "[COMM] ip : " << inet_ntoa(sin.sin_addr) << " port : " << m_attr["udp_recv_port"].asInt() << ", send message(" << size << ") : " << buff << endl;
 }
 
 void CCommMgr::Run()

@@ -4,8 +4,6 @@
 extern char __BUILD_DATE;
 extern char __BUILD_NUMBER;
 
-using namespace std;
-
 CCore::CCore(void)
 {
 	m_bExit = false;
@@ -18,7 +16,7 @@ CCore::~CCore(void)
 
 	_d("[CORE] Trying to exit thread\n");
 	Terminate();
-    //Terminate is Thread Join Completed 
+	//Terminate is Thread Join Completed
 	_d("[CORE] Exited...\n");
 
 	Delete();
@@ -29,7 +27,7 @@ CCore::~CCore(void)
 bool CCore::Create(int type)
 {
 	m_nChannel = 0;
-    m_type = type;
+	m_type = type;
 	ifstream ifs("./setting.json", ifstream::binary);
 
 	if (!ifs.is_open())

@@ -4,24 +4,31 @@
 CQueue::CQueue()
 {
 	m_nMaxQueue = MAX_NUM_QUEUE;
+	m_nMaxAudioQueue = MAX_NUM_AUDIO_QUEUE;
+
 	m_nSizeQueue = 0;
 
 	m_bEnable = false;
 	m_nPacket = 0;
+	m_nAudio = 0;
+
+	m_nReadPos = 0;
+	m_nWritePos = 0;
+	m_nReadAudioPos = 0;
+	m_nWriteAudioPos = 0;
 
 	pthread_mutex_init(&m_mutex, NULL);
-	cout << "[QUEUE] Contructor" << endl;
 }
 
 CQueue::~CQueue()
 {
 	pthread_mutex_destroy(&m_mutex);
-	cout << "[QUEUE.ch" << m_nChannel << "] detoryed" << endl;
 }
 
-void CQueue::SetChannel(int nChannel)
+void CQueue::SetInfo(int nChannel, string type)
 {
 	m_nChannel = nChannel;
+	m_type = type;
 }
 
 void CQueue::Clear()
@@ -49,10 +56,45 @@ void CQueue::Enable()
 	//_d("[QUEUE] Enable packet outputing now...%d\n", m_nPacket);
 	cout << "[QUEUE.ch" << m_nChannel << "] Enable packet outputing now... " << m_nPacket << endl;
 }
+int CQueue::PutAudio(char *pData, int nSize)
+{
+	int nCount = 0;
+
+	while (true)
+	{
+		ELEM *pe = &m_e[m_nWriteAudioPos];
+		pe->p = new char[nSize];
+		pthread_mutex_lock(&m_mutex);
+		if (pe->len == 0)
+		{
+			memcpy(pe->p, pData, nSize);
+			pe->len = nSize;
+
+			m_nWriteAudioPos++;
+			if (m_nWriteAudioPos >= m_nMaxAudioQueue)
+			{
+				m_nWriteAudioPos = 0;
+			}
+			m_nAudio++;
+			//cout << "[QUEUE.ch" << m_nChannel << "] m_nWriteAudioPos : " << m_nWriteAudioPos << endl;
+			pthread_mutex_unlock(&m_mutex);
+			return 0;
+		}
+		pthread_mutex_unlock(&m_mutex);
+		usleep(10);
+
+		nCount++;
+		if (nCount >= 100000)
+		{
+			cout << "[QUEUE.ch" << m_nChannel << " ] TImeout" << endl;
+			break;
+		}
+	}
+}
 
 int CQueue::Put(AVPacket *pkt)
 {
-	int nCount = 0;
+	int nCount = 0; // timeout 위한 용도
 
 	while (true)
 	{
@@ -87,6 +129,28 @@ int CQueue::Put(AVPacket *pkt)
 	return 0;
 }
 
+void *CQueue::GetAudio()
+{
+	if (m_bEnable == false)
+	{
+		return NULL;
+	}
+
+	while (true)
+	{
+		ELEM *pe = &m_e[m_nReadAudioPos];
+		//cout << "[QUEUE.ch" << m_nChannel << "] m_nReadAudioPos : " << m_nReadAudioPos << ", pe->len : " << pe->len << endl;
+		pthread_mutex_lock(&m_mutex);
+		if (pe->len)
+		{
+			pthread_mutex_unlock(&m_mutex);
+			return pe;
+		}
+		pthread_mutex_unlock(&m_mutex);
+		usleep(10);
+	}
+}
+
 int CQueue::Get(AVPacket *pkt)
 {
 	if (m_bEnable == false)
@@ -101,8 +165,10 @@ int CQueue::Get(AVPacket *pkt)
 #if __DEBUG
 		cout << "[QUEUE.ch" << m_nChannel << "] m_nReadPos : " << m_nReadPos << ", size : " << m_pkt[m_nReadPos].size << endl;
 #endif
+
 		av_init_packet(pkt);
 		av_packet_ref(pkt, &m_pkt[m_nReadPos]);
+		av_packet_unref(&m_pkt[m_nReadPos]);
 #if 0
 			if (m_nPacket < m_nDelay)
 			{
@@ -113,7 +179,6 @@ int CQueue::Get(AVPacket *pkt)
 #if 0
 		_d("[QUEUE.ch%d] get pos ( %d ), size ( %d ), data ( %p ),  type : %d, m_nPacket : %d\n", m_nChannel, m_nReadPos, m_pkt[m_nReadPos].size, m_pkt[m_nReadPos].data, m_pkt[m_nReadPos].stream_index, m_nPacket);
 #endif
-		av_packet_unref(&m_pkt[m_nReadPos]);
 		pthread_mutex_unlock(&m_mutex);
 		return pkt->size;
 	}
@@ -124,6 +189,25 @@ int CQueue::Get(AVPacket *pkt)
 	}
 	//pthread_mutex_unlock(&m_mutex);
 	//usleep(5);
+}
+
+void CQueue::RetAudio(void *p)
+{
+	ELEM *pe = (ELEM *)p;
+	pthread_mutex_lock(&m_mutex);
+
+	pe->len = 0;
+	m_nReadAudioPos++;
+	if (m_nReadAudioPos >= m_nMaxAudioQueue)
+	{
+		m_nReadAudioPos = 0;
+	}
+	m_nAudio--;
+	if (pe->p)
+	{
+		delete pe->p;
+	}
+	pthread_mutex_unlock(&m_mutex);
 }
 
 void CQueue::Ret(AVPacket *pkt)
