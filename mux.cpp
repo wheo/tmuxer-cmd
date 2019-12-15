@@ -9,6 +9,7 @@ extern char __BUILD_NUMBER;
 CMux::CMux(void)
 {
 	m_bExit = false;
+	m_pMuxer = NULL;
 	pthread_mutex_init(&m_mutex_mux, 0);
 }
 
@@ -37,7 +38,10 @@ bool CMux::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_type = info["type"].asString();
 	SetSocket();
 
-	m_pMuxer = new CTSMuxer();
+	if (m_type == "video")
+	{
+		m_pMuxer = new CTSMuxer();
+	}
 	if (m_queue)
 	{
 		cout << "[CMUX.ch" << nChannel << "] Worker created" << endl;
@@ -67,7 +71,7 @@ bool CMux::SetQueue(CQueue **queue, int nChannel)
 {
 	m_queue = *queue;
 	m_nChannel = nChannel;
-	return EXIT_SUCCESS;
+	return true;
 }
 
 void CMux::Run()
@@ -104,7 +108,7 @@ bool CMux::Muxing()
 	}
 	else
 	{
-		sub_dir_name = "error";
+		sub_dir_name = get_current_time_and_date();
 	}
 	if (m_attr["bit_state"].asString().size() > 0)
 	{
@@ -178,7 +182,7 @@ bool CMux::Muxing()
 
 	while (!m_bExit)
 	{
-		if (m_type == "video")
+		if (m_type == "video" && !m_bExit)
 		{
 			AVPacket pPkt;
 			if (m_queue->Get(&pPkt) > 0)
@@ -216,6 +220,7 @@ bool CMux::Muxing()
 					size = getFilesize(m_filename.c_str());
 					info["size"] = size;
 					root["info"] = info;
+					root["cmd"] = "get_file_info";
 
 					Json::StreamWriterBuilder builder;
 					builder["commentStyle"] = "None";
@@ -239,7 +244,7 @@ bool CMux::Muxing()
 				}
 			}
 		}
-		else if (m_type == "audio")
+		else if (m_type == "audio" && !m_bExit)
 		{
 			ELEM *pe = (ELEM *)m_queue->GetAudio();
 			if (pe)
@@ -273,6 +278,7 @@ bool CMux::Muxing()
 					size = getFilesize(m_audio_name.c_str());
 					info["size"] = size;
 					root["info"] = info;
+					root["cmd"] = "get_file_info";
 
 					Json::StreamWriterBuilder builder;
 					builder["commentStyle"] = "None";
@@ -280,7 +286,7 @@ bool CMux::Muxing()
 
 					strbuf = Json::writeString(builder, root);
 
-					TX((char *)strbuf.c_str(), strlen(strbuf.c_str()));
+					TX((char *)strbuf.c_str(), strbuf.length());
 
 					sstm.str("");
 					sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".audio";
@@ -315,7 +321,7 @@ bool CMux::TX(char *buff, int size)
 	sin.sin_port = htons(m_attr["udp_target_port"].asInt());
 
 	sendto(m_sdSend, buff, size, 0, (struct sockaddr *)&sin, sin_size);
-	cout << "[CMUX] ip : " << inet_ntoa(sin.sin_addr) << " port : " << m_attr["udp_target_port"].asInt() << ", send message size : " << size << endl;
+	cout << "[CMUX] ip : " << inet_ntoa(sin.sin_addr) << " port : " << m_attr["udp_target_port"].asInt() << ", send message : " << buff << endl;
 }
 
 void CMux::Delete()

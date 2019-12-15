@@ -128,13 +128,19 @@ bool CRecv::SetSocket()
 
 bool CRecv::Receive()
 {
-	unsigned char buff_rcv[PACKET_SIZE + 16];
+	unsigned char buff_rcv[PACKET_HEADER_SIZE + PACKET_SIZE];
 	unsigned char frame_buf[MAX_frame_size];
 	int rd;
 	int fd = 0;
 	int recv_nTotalStreamSize = 0;
 	int recv_nCurStreamSize = 0;
 	int recv_nestedStreamSize = 0;
+	char recv_type = 0;		  // 1(NTSC), 2(PAL), 3(PANORAMA), 4(FOCUS)
+	char recv_codec_type = 0; // 1(HEVC), 2(H264)
+	char recv_frame_type = 0; // 0(P frame), 1(I frame)
+	char recv_reserve[5] = {
+		0,
+	};
 
 	int nTotalPacketNum = 0;
 	int nCurPacketNum = 0;
@@ -147,14 +153,11 @@ bool CRecv::Receive()
 	memset(&frame_buf, 0x00, sizeof(&frame_buf));
 
 	cout << "[RECV.ch" << m_nChannel << "] type : " << m_info["type"].asString() << endl;
-	if (m_info["type"].asString() == "audio" || m_info["type"].asString() == "video")
-	{
-		m_queue->Enable();
-	}
+
 	while (!m_bExit)
 	{
 		/* code */
-		rd = recvfrom(m_sock, buff_rcv, PACKET_SIZE + 16, 0, NULL, 0);
+		rd = recvfrom(m_sock, buff_rcv, PACKET_HEADER_SIZE + PACKET_SIZE, 0, NULL, 0);
 #if __DEBUG
 		_d("[RECV.ch%d] rd : %d\n", m_nChannel, rd);
 #endif
@@ -163,13 +166,18 @@ bool CRecv::Receive()
 			usleep(10);
 			continue;
 		}
+		// 최초 recv 받고 나서 enable
+		if (m_info["type"].asString() == "audio" || m_info["type"].asString() == "video")
+		{
+			m_queue->Enable();
+		}
 		if (m_info["type"].asString() == "audio")
 		{
 			void *p;
 			p = buff_rcv;
 			m_queue->PutAudio((char *)p, rd);
 		}
-		else
+		else if (m_info["type"].asString() == "video")
 		{
 #if 0
 			if (m_info["type"].asString() == "video")
@@ -177,14 +185,19 @@ bool CRecv::Receive()
 				continue;
 			}
 #endif
-			memcpy(&recv_nTotalStreamSize, buff_rcv, 4);
-			memcpy(&recv_nCurStreamSize, buff_rcv + 4, 4);
-			memcpy(&nTotalPacketNum, buff_rcv + 8, 4);
-			memcpy(&nCurPacketNum, buff_rcv + 12, 4);
+			memcpy(&recv_nTotalStreamSize, buff_rcv, sizeof(recv_nTotalStreamSize));
+			memcpy(&recv_nCurStreamSize, buff_rcv + 4, sizeof(recv_nCurStreamSize));
+			memcpy(&nTotalPacketNum, buff_rcv + 8, sizeof(nTotalPacketNum));
+			memcpy(&nCurPacketNum, buff_rcv + 12, sizeof(nCurPacketNum));
+			memcpy(&recv_type, buff_rcv + 16, 1);
+			memcpy(&recv_codec_type, buff_rcv + 17, 1);
+			memcpy(&recv_frame_type, buff_rcv + 18, 1);
+			memcpy(&recv_reserve, buff_rcv + 19, sizeof(recv_reserve));
 #if 0
-		for (int i=0;i<16;i++) {
-			_d("offset : %d, mem[%d] : %x\n",i, i, buff_rcv[i] );
-		}
+			for (int i = 0; i < PACKET_HEADER_SIZE; i++)
+			{
+				_d("offset : %d, mem[%d] : %x\n", i, i, buff_rcv[i]);
+			}
 #endif
 			if ((nPrevPacketNum + 1) != nCurPacketNum)
 			{
@@ -197,7 +210,7 @@ bool CRecv::Receive()
 			//_d("nTotalPacketNum(%d)/nCurPacketNum(%d), recv_nestedStreamSize(%d)\n", nTotalPacketNum, nCurPacketNum, recv_nestedStreamSize);
 			cout << "[RECV.ch." << m_nChannel << "] nTotalPacketNum(" << nTotalPacketNum << "/" << nCurPacketNum << ", " << recv_nestedStreamSize << ")" << endl;
 #endif
-			memcpy(frame_buf + recv_nestedStreamSize, buff_rcv + 16, recv_nCurStreamSize);
+			memcpy(frame_buf + recv_nestedStreamSize, buff_rcv + PACKET_HEADER_SIZE, recv_nCurStreamSize);
 			recv_nestedStreamSize += recv_nCurStreamSize;
 #if __DEBUG
 			_d("[RECV.ch%d] (%d/%d)\n", m_nChannel, recv_nCurStreamSize, recv_nestedStreamSize);

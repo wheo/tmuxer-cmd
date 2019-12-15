@@ -198,7 +198,7 @@ bool CCommMgr::RX()
 
     while (!m_bExit)
     {
-        memset(buff, 0x00, 0);
+        memset(buff, 0x00, sizeof(buff));
         rd_size = recvfrom(m_sdRecv, buff, READ_SIZE, 0, (struct sockaddr *)&sin, &sin_size);
         memcpy(m_RecvBuf, buff, rd_size);
         //cout << "[COMM] rd_size : " << rd_size << endl;
