@@ -38,10 +38,15 @@ bool CMux::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_type = info["type"].asString();
 	SetSocket();
 
+#if 0 
 	if (m_type == "video")
 	{
 		m_pMuxer = new CTSMuxer();
 	}
+#else
+	m_pMuxer = new CTSMuxer();
+#endif
+
 	if (m_queue)
 	{
 		cout << "[CMUX.ch" << nChannel << "] Worker created" << endl;
