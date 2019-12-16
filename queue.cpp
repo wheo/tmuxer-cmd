@@ -86,7 +86,7 @@ int CQueue::PutAudio(char *pData, int nSize)
 		nCount++;
 		if (nCount >= 100000)
 		{
-			cout << "[QUEUE.ch" << m_nChannel << " ] TImeout" << endl;
+			cout << "[QUEUE.ch" << m_nChannel << " ] Timeout" << endl;
 			break;
 		}
 	}
