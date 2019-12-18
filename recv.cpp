@@ -5,7 +5,6 @@ extern char __BUILD_DATE;
 extern char __BUILD_NUMBER;
 
 #define MAX_NUM_bitstream 4
-#define MAX_frame_size 1024 * 1024 // 1MB
 
 CRecv::CRecv(void)
 {
@@ -21,6 +20,7 @@ CRecv::~CRecv(void)
 	Delete();
 	Terminate();
 	_d("[RECV.ch%d] exited...\n", m_nChannel);
+	delete[] m_frame_buf;
 
 	pthread_mutex_destroy(&m_mutex_recv);
 }
@@ -35,15 +35,18 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_nChannel = nChannel;
 	m_attr = attr;
 	m_file_idx = 0;
+	m_Is_iframe = false;
+	m_frame_buf = new unsigned char[MAX_frame_size];
+	_d("[RECV.ch%d] alloc : %x\n", m_nChannel, m_frame_buf);
 
 	if (!SetSocket())
 	{
-		cout << "[RECV] SetSocket() is failed" << endl;
+		cout << "[RECV.ch" << m_nChannel << "] SetSocket() is failed" << endl;
 		return false;
 	}
 	else
 	{
-		cout << "[RECV] SetSocket() is succeed" << endl;
+		cout << "[RECV.ch" << m_nChannel << "] SetSocket() is succeed" << endl;
 	}
 
 	m_queue = new CQueue();
@@ -129,7 +132,7 @@ bool CRecv::SetSocket()
 bool CRecv::Receive()
 {
 	unsigned char buff_rcv[PACKET_HEADER_SIZE + PACKET_SIZE];
-	unsigned char frame_buf[MAX_frame_size];
+
 	int rd;
 	int fd = 0;
 	int recv_nTotalStreamSize = 0;
@@ -150,10 +153,16 @@ bool CRecv::Receive()
 	mux_cfg_s mux_cfg;
 	memset(&mux_cfg, 0x00, sizeof(mux_cfg_s));
 #endif
-	memset(&frame_buf, 0x00, sizeof(&frame_buf));
+	//memset(m_frame_buf, 0x00, sizeof(m_frame_buf));
 
 	cout << "[RECV.ch" << m_nChannel << "] type : " << m_info["type"].asString() << endl;
+	m_queue->Enable();
 
+	high_resolution_clock::time_point begin;
+	high_resolution_clock::time_point end;
+	int64_t tick_diff = 0;
+
+	begin = high_resolution_clock::now();
 	while (!m_bExit)
 	{
 		/* code */
@@ -166,11 +175,13 @@ bool CRecv::Receive()
 			usleep(10);
 			continue;
 		}
+#if 0
 		// 최초 recv 받고 나서 enable
 		if (m_info["type"].asString() == "audio" || m_info["type"].asString() == "video")
 		{
 			m_queue->Enable();
 		}
+#endif
 		if (m_info["type"].asString() == "audio")
 		{
 			void *p;
@@ -210,7 +221,8 @@ bool CRecv::Receive()
 			//_d("nTotalPacketNum(%d)/nCurPacketNum(%d), recv_nestedStreamSize(%d)\n", nTotalPacketNum, nCurPacketNum, recv_nestedStreamSize);
 			cout << "[RECV.ch." << m_nChannel << "] nTotalPacketNum(" << nTotalPacketNum << "/" << nCurPacketNum << ", " << recv_nestedStreamSize << ")" << endl;
 #endif
-			memcpy(frame_buf + recv_nestedStreamSize, buff_rcv + PACKET_HEADER_SIZE, recv_nCurStreamSize);
+			//_d("add : %x, size : %d\n", m_frame_buf, MAX_frame_size);
+			memcpy(m_frame_buf + recv_nestedStreamSize, buff_rcv + PACKET_HEADER_SIZE, recv_nCurStreamSize);
 			recv_nestedStreamSize += recv_nCurStreamSize;
 #if __DEBUG
 			_d("[RECV.ch%d] (%d/%d)\n", m_nChannel, recv_nCurStreamSize, recv_nestedStreamSize);
@@ -225,10 +237,27 @@ bool CRecv::Receive()
 				AVPacket *pPkt;
 				pPkt = av_packet_alloc();
 
-				pPkt->data = frame_buf;
+				pPkt->data = m_frame_buf;
 				pPkt->size = recv_nestedStreamSize;
 				//pPkt->pts = 1000;
-				m_queue->Put(pPkt);
+
+				if (recv_frame_type == 1) // iframe
+				{
+					m_Is_iframe = true;
+				}
+
+				//_d("[RECV.ch%d] frame type : %d, pkt.flags : %d\n", m_nChannel, recv_frame_type, pPkt->flags);
+				//if (m_Is_iframe == true)
+				if (true)
+				{
+
+					m_queue->Put(pPkt);
+					end = high_resolution_clock::now();
+					tick_diff = duration_cast<microseconds>(end - begin).count();
+					//_d("[RECV.ch%d][%lld] Putted !!!!! frame type : %d, pkt.flags : %d\n", m_nChannel, tick_diff, recv_frame_type, pPkt->flags);
+					begin = end;
+					tick_diff = 0;
+				}
 				av_packet_free(&pPkt);
 
 				recv_nestedStreamSize = 0;

@@ -36,6 +36,7 @@ void CQueue::Clear()
 	for (int i = 0; i < m_nMaxQueue; i++)
 	{
 		//avpacket unref 해야 함
+		av_packet_unref(&m_pkt[i]);
 	}
 
 	m_nReadPos = 0;
@@ -168,7 +169,7 @@ int CQueue::Get(AVPacket *pkt)
 
 		av_init_packet(pkt);
 		av_packet_ref(pkt, &m_pkt[m_nReadPos]);
-		av_packet_unref(&m_pkt[m_nReadPos]);
+
 #if 0
 			if (m_nPacket < m_nDelay)
 			{
@@ -176,9 +177,10 @@ int CQueue::Get(AVPacket *pkt)
 				return NULL;
 			}
 #endif
-#if 0
+#if __DEBUG
 		_d("[QUEUE.ch%d] get pos ( %d ), size ( %d ), data ( %p ),  type : %d, m_nPacket : %d\n", m_nChannel, m_nReadPos, m_pkt[m_nReadPos].size, m_pkt[m_nReadPos].data, m_pkt[m_nReadPos].stream_index, m_nPacket);
 #endif
+		av_packet_unref(&m_pkt[m_nReadPos]);
 		pthread_mutex_unlock(&m_mutex);
 		return pkt->size;
 	}

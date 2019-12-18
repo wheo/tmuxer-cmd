@@ -45,6 +45,8 @@ private:
 	int m_file_idx;	// 파일 인덱스 번호
 	string m_filename;
 	int m_sock;
+	bool m_Is_iframe;
+	unsigned char *m_frame_buf;
 
 	Json::Value json;
 

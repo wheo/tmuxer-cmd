@@ -10,6 +10,18 @@
         "array": "cpp",
         "initializer_list": "cpp",
         "chrono": "cpp",
-        "mutex": "cpp"
+        "mutex": "cpp",
+        "iostream": "cpp",
+        "*.tcc": "cpp",
+        "cctype": "cpp",
+        "clocale": "cpp",
+        "cmath": "cpp",
+        "cstdio": "cpp",
+        "cstdlib": "cpp",
+        "cstring": "cpp",
+        "ctime": "cpp",
+        "cwchar": "cpp",
+        "cwctype": "cpp",
+        "sstream": "cpp"
     }    
 }

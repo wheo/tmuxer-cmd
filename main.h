@@ -47,6 +47,7 @@ using namespace chrono;
 
 #define __DEBUG 0
 #define __DUMP 1
+#define __IP_FILE_NAME 1
 
 #include "misc.h"
 
@@ -55,6 +56,7 @@ using namespace chrono;
 
 #define MAX_VIDEO_CHANNEL_COUNT 6
 #define MAX_AUDIO_CHANNEL_COUNT 2
+#define MAX_frame_size 1024 * 1024 * 32 // 32MB
 
 #ifdef DEBUG
 #undef DEBUG
