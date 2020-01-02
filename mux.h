@@ -12,7 +12,6 @@ public:
 	~CMux(void);
 
 	//int ReadSocket(uint8_t *buffer, unsigned bufferSize);
-	bool SetSocket();
 	bool TX(char *buff, int size);
 	bool Create(Json::Value info, Json::Value attr, int nChannel);
 	void Delete();
@@ -38,8 +37,10 @@ private:
 	int m_nFrameCount; // 프레임 수
 	int m_nAudioCount; // 오디오 수
 	int m_file_idx;	// 파일 인덱스 번호
+	int m_is_intra;
 	string m_filename;
 	string m_es_name;
+	string m_bin_name;
 	string m_audio_name;
 	//int m_sock;
 	int m_sdSend;
@@ -50,6 +51,8 @@ private:
 
 	CTSMuxer *m_pMuxer;
 	CQueue *m_queue;
+
+	bool SetSocket();
 
 protected:
 	void Run();

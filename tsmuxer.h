@@ -1,9 +1,10 @@
 #ifndef _TSMUXER_H_
 #define _TSMUXER_H_
 
-#define MAX_NUM_STREAMS		9
+#define MAX_NUM_STREAMS 9
 #include "tspes.h"
-typedef struct {
+typedef struct
+{
 	int streams;
 
 	int dump_en;
@@ -14,10 +15,11 @@ typedef struct {
 	int payload_size;
 
 	es_s es[MAX_NUM_STREAMS];
-}muxer_s;
+} muxer_s;
 
-typedef struct {
-	int codec;		//> 0- H264, 1- HEVC
+typedef struct
+{
+	int codec; //> 0- H264, 1- HEVC
 	int profile;
 	int level;
 	int quality;
@@ -27,6 +29,8 @@ typedef struct {
 	int rc;
 	int bitrate;
 	double fps;
+	int num;
+	int den;
 	int min_gop;
 	int max_gop;
 	int bframes;
@@ -38,32 +42,36 @@ typedef struct {
 	bool is_interlace;
 	bool is_dummy1;
 	bool is_dummy2;
-}video_cfg_s;
+} video_cfg_s;
 
-typedef struct {
-	int output;	//> 0- ts, 1- mp4
+typedef struct
+{
+	int output; //> 0- ts, 1- mp4
 	int mux_rate;
 
 	video_cfg_s vid;
-}mux_cfg_s;
+} mux_cfg_s;
 
-typedef struct {
+typedef struct
+{
 	char strIP[100];
 	int nPort;
 	mux_cfg_s mux;
-}channel_cfg_s;
+} channel_cfg_s;
 
-typedef struct {
+typedef struct
+{
 	uint8_t p[1328];
 	int len;
 	int corrupt;
 
 	int64_t valid_pts;
 	int64_t pcr;
-}packet_s;
+} packet_s;
 
 // a wrapper around a single output AVStream
-typedef struct OutputStream {
+typedef struct OutputStream
+{
 	AVStream *st;
 	AVCodecContext *enc;
 
@@ -94,7 +102,7 @@ public:
 
 private:
 	void add_stream(OutputStream *ost, AVFormatContext *oc, AVCodec **codec, enum AVCodecID codec_id);
-	void close_stream(AVFormatContext *oc, OutputStream *ost);	
+	void close_stream(AVFormatContext *oc, OutputStream *ost);
 
 	void open_audio(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, AVDictionary *opt_arg);
 	void open_video(AVFormatContext *oc, AVCodec *codec, OutputStream *ost, AVDictionary *opt_arg);
@@ -102,10 +110,12 @@ private:
 	int write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base, AVStream *st, AVPacket *pkt);
 
 	AVFrame *alloc_picture(enum AVPixelFormat pix_fmt, int width, int height);
+
 protected:
 	muxer_s m_muxer;
 
 	int m_nRecSec;
+
 private:
 	bool m_bhave_video;
 	bool m_bhave_audio;
@@ -118,7 +128,10 @@ private:
 
 	AVCodec *m_audio_codec;
 	AVCodec *m_video_codec;
-	
+
+	const AVBitStreamFilter *m_bsf = NULL;
+	AVBSFContext *m_bsfc = NULL;
+
 	int64_t m_nFrameCount;
 };
 

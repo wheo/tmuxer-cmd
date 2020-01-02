@@ -113,11 +113,32 @@ bool CTSMuxer::CreateOutput(const char *strFilePath, mux_cfg_s *mux_cfg, int nRe
 	if (ret < 0)
 	{
 		//fprintf(stderr, "Error occurred when opening output file: %s\n", av_err2str(ret));
-		_d("[Muxer] Error occurred when opening output file: %s\n", strFilePath);
+		_d("[TSMUXER] Error occurred when opening output file: %s\n", strFilePath);
 		return 1;
 	}
-
 	m_nFrameCount = 0;
+
+#if 0
+	m_bsf = av_bsf_get_by_name("hevc_metadata");
+
+	if (av_bsf_alloc(m_bsf, &m_bsfc) < 0)
+	{
+		_d("[TSMUXER] Failed to alloc bsfc\n");
+		return false;
+	}
+	if (avcodec_parameters_copy(m_bsfc->par_in, m_poc_ctx->streams[0]->codecpar) < 0)
+	{
+		_d("[TSMUXER] Failed to copy codec param.\n");
+		return false;
+	}
+	m_bsfc->time_base_in = m_poc_ctx->streams[0]->time_base;
+
+	if (av_bsf_init(m_bsfc) < 0)
+	{
+		_d("[DEMUXER] Failed to init bsfc\n");
+		return false;
+	}
+#endif
 
 	return true;
 }
@@ -132,14 +153,14 @@ void CTSMuxer::add_stream(OutputStream *ost, AVFormatContext *oc, AVCodec **code
 	*codec = avcodec_find_encoder(codec_id);
 	if (!(*codec))
 	{
-		_d("[Muxer] Could not find encoder for '%s'\n", avcodec_get_name(codec_id));
+		_d("[TSMUXER] Could not find encoder for '%s'\n", avcodec_get_name(codec_id));
 		return;
 	}
 
 	ost->st = avformat_new_stream(oc, *codec);
 	if (!ost->st)
 	{
-		_d("[Muxer] Could not allocate stream\n");
+		_d("[TSMUXER] Could not allocate stream\n");
 		return;
 	}
 	ost->st->id = oc->nb_streams - 1;
@@ -147,7 +168,7 @@ void CTSMuxer::add_stream(OutputStream *ost, AVFormatContext *oc, AVCodec **code
 	c = avcodec_alloc_context3(*codec);
 	if (!c)
 	{
-		_d("[Muxer] Could not alloc an encoding context\n");
+		_d("[TSMUXER] Could not alloc an encoding context\n");
 		return;
 	}
 	ost->enc = c;
@@ -192,11 +213,12 @@ void CTSMuxer::add_stream(OutputStream *ost, AVFormatContext *oc, AVCodec **code
 		c->width = m_mux_cfg.vid.width;
 		c->height = m_mux_cfg.vid.height;
 
-		/* timebase: This is the fundamental unit of time (in seconds) in terms
+/* timebase: This is the fundamental unit of time (in seconds) in terms
 		* of which frame timestamps are represented. For fixed-fps content,
 		* timebase should be 1/framerate and timestamp increments should be
 		* identical to 1. */
-		//	ost->st->time_base = (AVRational) { 1, STREAM_FRAME_RATE };
+//	ost->st->time_base = (AVRational) { 1, STREAM_FRAME_RATE };
+#if 0
 		if (m_mux_cfg.vid.fps == 29.97)
 		{
 			ost->st->time_base.num = 1001;
@@ -207,7 +229,13 @@ void CTSMuxer::add_stream(OutputStream *ost, AVFormatContext *oc, AVCodec **code
 			ost->st->time_base.num = 1;
 			ost->st->time_base.den = m_mux_cfg.vid.fps;
 		}
+#else
+		ost->st->time_base.num = m_mux_cfg.vid.num;
+		ost->st->time_base.den = m_mux_cfg.vid.den;
+#endif
+
 		c->time_base = ost->st->time_base;
+		_d("[TSMUXER] %d/%d\n", ost->st->time_base.num, ost->st->time_base.den);
 
 		c->gop_size = m_mux_cfg.vid.max_gop; /* emit one intra frame every twelve frames at most */
 
@@ -274,7 +302,7 @@ void CTSMuxer::open_video(AVFormatContext *oc, AVCodec *codec, OutputStream *ost
 		if (!ost->tmp_frame)
 		{
 			fprintf(stderr, "Could not allocate temporary picture\n");
-			exit(1);
+			return;
 		}
 	}
 
@@ -283,7 +311,7 @@ void CTSMuxer::open_video(AVFormatContext *oc, AVCodec *codec, OutputStream *ost
 	if (ret < 0)
 	{
 		fprintf(stderr, "Could not copy the stream parameters\n");
-		exit(1);
+		return;
 	}
 }
 
@@ -308,7 +336,7 @@ AVFrame *CTSMuxer::alloc_picture(enum AVPixelFormat pix_fmt, int width, int heig
 	if (ret < 0)
 	{
 		fprintf(stderr, "Could not allocate frame data.\n");
-		exit(1);
+		//exit(1);
 	}
 
 	return picture;
@@ -359,9 +387,36 @@ int CTSMuxer::write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base,
 	pkt->dts = pkt->pts;
 #endif
 
+	//_d("[TSMUXER] time_base : %d/%d, pkt pts/dts : %lld/%lld\n", time_base->num, time_base->den, pkt->pts, pkt->dts);
+
 	/* Write the compressed frame to the media file. */
-	//	log_packet(fmt_ctx, pkt);
+	//log_packet(fmt_ctx, pkt);
+
+#if 0
+	if ((ret = av_bsf_send_packet(m_bsfc, pkt)) < 0)
+	{
+		_d("[TSMUXER] Failed to send packet to filter %s for stream %d\n", m_bsfc->filter->name, pkt->stream_index);
+	}
+	// TODO: when any automatically-added bitstream filter is generating multiple
+	// output packets for a single input one, we'll need to call this in a loop
+	// and write each output packet.
+	if ((ret = av_bsf_receive_packet(m_bsfc, pkt)) < 0)
+	{
+		if (ret == AVERROR(EAGAIN) || ret == AVERROR_EOF)
+		{
+			_d("[TSMUXER] Failed to receive packet from filter %s for stream %d\n", m_bsfc->filter->name, pkt->stream_index);
+		}
+	}
+#endif
+
+	//on auto bsf
+	//fmt_ctx->flags |= AVFMT_FLAG_AUTO_BSF;
+	//fmt_ctx->flags |= AVFMT_FLAG_IGNDTS;
+	//fmt_ctx->flags |= AVFMT_FLAG_NOFILLIN;
+	//_d("fmt_ctx_flag : %x\n", fmt_ctx->flags); //확인완료 AVFMT_FLAG_AUTO_BSF
+
 	ret = av_interleaved_write_frame(fmt_ctx, pkt);
+	//_d("av_interleaved_write_frame : ret : %d\m", ret);
 	return ret;
 }
 

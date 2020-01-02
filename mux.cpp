@@ -35,6 +35,8 @@ bool CMux::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_attr = attr;
 	m_file_idx = 0;
 	m_type = info["type"].asString();
+	m_is_intra = false;
+
 	SetSocket();
 
 	if (m_type == "video")
@@ -146,19 +148,25 @@ bool CMux::Muxing()
 	m_es_name = sstm.str();
 	sstm.str("");
 
-	//sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".audio";
+#if __IP_FILE_NAME
+	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".audio";
+#else
 	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".audio";
+#endif
 	m_audio_name = sstm.str();
 
 	mux_cfg.output = 1;
 	mux_cfg.vid.codec = m_attr["codec"].asInt(); // 0 : H264, 1 : HEVC
 	//mux_cfg.vid.bitrate = 6000000;
 	//mux_cfg.vid.fps = m_info["fps"].asDouble();
-	double num = m_info["num"].asDouble();
-	double den = m_info["den"].asDouble();
-	mux_cfg.vid.fps = den / num;
+	int num = m_info["num"].asInt();
+	int den = m_info["den"].asInt();
+	mux_cfg.vid.num = num;
+	mux_cfg.vid.den = den;
+	mux_cfg.vid.fps = (double)den / (double)num;
 	mux_cfg.vid.width = m_info["width"].asInt();
 	mux_cfg.vid.height = m_info["height"].asInt();
+	_d("[MUX.ch%d] fps : %.3f\n", m_nChannel, mux_cfg.vid.fps);
 
 	Json::Value meta;
 	Json::Value mux_files;
@@ -181,7 +189,6 @@ bool CMux::Muxing()
 	string channel;
 
 	FILE *es = fopen(m_es_name.c_str(), "wb");
-
 	FILE *pAudio = fopen(m_audio_name.c_str(), "wb");
 
 	m_nRecSec = m_attr["rec_sec"].asInt();
@@ -189,6 +196,7 @@ bool CMux::Muxing()
 	Json::Value root;
 	Json::Value info;
 	int size;
+	int ret = 0;
 	string strbuf;
 
 	while (!m_bExit)
@@ -199,9 +207,16 @@ bool CMux::Muxing()
 			if (m_queue->Get(&pPkt) > 0)
 			{
 				//es write
-				fwrite(pPkt.data, 1, pPkt.size, es);
-
-				m_pMuxer->put_data(&pPkt);
+				//_d("flag : %x\n", pPkt.flags);
+				if (pPkt.flags == AV_PKT_FLAG_KEY)
+				{
+					m_is_intra = true;
+				}
+				if (m_is_intra == true)
+				{
+					fwrite(pPkt.data, 1, pPkt.size, es);
+					m_pMuxer->put_data(&pPkt);
+				}
 				m_queue->Ret(&pPkt);
 			}
 			else
@@ -222,6 +237,7 @@ bool CMux::Muxing()
 				{
 					int finalFrameCount = 0;
 					finalFrameCount = m_nFrameCount;
+					string final_filename = m_filename;
 					m_nFrameCount = 0;
 
 					cout << "[MUX.ch." << m_nChannel << "] " << m_filename << " mux completed" << endl;
@@ -253,7 +269,9 @@ bool CMux::Muxing()
 					m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg);
 
 					fclose(es);
-					mux_files["name"] = m_es_name;
+					m_is_intra = false;
+
+					mux_files["name"] = final_filename;
 					mux_files["frame"] = finalFrameCount;
 					meta["files"].append(mux_files);
 					CreateMetaJson(meta, group_name);
@@ -293,6 +311,7 @@ bool CMux::Muxing()
 				{
 					int finalAudioCount = 0;
 					finalAudioCount = m_nAudioCount;
+					string final_filename = m_audio_name;
 
 					m_nAudioCount = 0;
 
@@ -300,14 +319,15 @@ bool CMux::Muxing()
 					m_file_idx++;
 
 					fclose(pAudio);
-					mux_files["name"] = m_audio_name;
+
+					mux_files["name"] = final_filename;
 					mux_files["frame"] = finalAudioCount;
 					meta["files"].append(mux_files);
 					CreateMetaJson(meta, group_name);
 
 					// audio 이름 및 사이즈 전송
-					info["filename"] = m_audio_name;
-					size = getFilesize(m_audio_name.c_str());
+					info["filename"] = final_filename;
+					size = getFilesize(final_filename.c_str());
 					info["size"] = size;
 					root["info"] = info;
 					root["cmd"] = "get_file_info";

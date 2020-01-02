@@ -31,12 +31,14 @@ int main(int argc, char *argv[])
     rlim.rlim_max = (4096*1024*10);
     setrlimit(RLIMIT_STACK, &rlim);
 #endif
-    if ( argc < 2 ) {
+    if (argc < 2)
+    {
         cout << "[MAIN] ./tmuxer 0 or 1 ( 0 is 24 hour Rec, 1 is Event Rec)" << endl;
         exit(0);
     }
 
-    if ( argv[1][0] != '0' && argv[1][0] != '1' ) {
+    if (argv[1][0] != '0' && argv[1][0] != '1')
+    {
         cout << "[MAIN] This program's parametar is only 0 or 1" << endl;
         exit(0);
     }
@@ -59,6 +61,8 @@ int main(int argc, char *argv[])
     //av_register_all();
     //avfilter_register_all();
     _d("[MAIN] Started...\n");
+
+    av_log_set_level(AV_LOG_DEBUG);
 
     int type = atoi(argv[1]);
     CCore *core = new CCore();

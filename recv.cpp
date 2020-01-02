@@ -241,23 +241,19 @@ bool CRecv::Receive()
 				pPkt->size = recv_nestedStreamSize;
 				//pPkt->pts = 1000;
 
-				if (recv_frame_type == 1) // iframe
+				if (recv_frame_type == 1)
 				{
-					m_Is_iframe = true;
+					pPkt->flags = AV_PKT_FLAG_KEY;
 				}
 
-				//_d("[RECV.ch%d] frame type : %d, pkt.flags : %d\n", m_nChannel, recv_frame_type, pPkt->flags);
-				//if (m_Is_iframe == true)
-				if (true)
-				{
+				//_d("[RECV.ch%d][%lld] Putted !!!!! frame type : %d, pkt.flags : %d\n", m_nChannel, tick_diff, recv_frame_type, pPkt->flags);
+				m_queue->Put(pPkt);
+				end = high_resolution_clock::now();
+				tick_diff = duration_cast<microseconds>(end - begin).count();
 
-					m_queue->Put(pPkt);
-					end = high_resolution_clock::now();
-					tick_diff = duration_cast<microseconds>(end - begin).count();
-					//_d("[RECV.ch%d][%lld] Putted !!!!! frame type : %d, pkt.flags : %d\n", m_nChannel, tick_diff, recv_frame_type, pPkt->flags);
-					begin = end;
-					tick_diff = 0;
-				}
+				begin = end;
+				tick_diff = 0;
+
 				av_packet_free(&pPkt);
 
 				recv_nestedStreamSize = 0;
