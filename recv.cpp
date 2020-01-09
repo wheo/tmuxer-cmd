@@ -87,6 +87,7 @@ bool CRecv::SetSocket()
 	mcast_group.sin_family = AF_INET;
 	mcast_group.sin_port = htons(m_info["port"].asInt());
 	mcast_group.sin_addr.s_addr = inet_addr(m_info["ip"].asString().c_str());
+	//mcast_group.sin_addr.s_addr = inet_addr(INADDR_ANY);
 
 	m_sock = socket(AF_INET, SOCK_DGRAM, 0);
 	if (-1 == m_sock)
@@ -110,6 +111,7 @@ bool CRecv::SetSocket()
 	}
 
 	mreq.imr_multiaddr = mcast_group.sin_addr;
+	//mreq.imr_multiaddr.s_addr = inet_addr(m_info["ip"].asString().c_str());
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 
 	if (setsockopt(m_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)

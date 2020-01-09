@@ -222,7 +222,7 @@ void CQueue::Ret(AVPacket *pkt)
 #if __DEBUG
 	if (m_nChannel == 0)
 	{
-		cout << "m_nReadPos : " << m_nReadPos << endl;
+		cout << "[QUEUE.ch" << m_nChannel << ":RET] m_nReadPos : " << m_nReadPos << endl;
 	}
 #endif
 	if (m_nReadPos >= m_nMaxQueue)

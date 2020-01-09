@@ -46,7 +46,7 @@ extern "C"
 using namespace std;
 using namespace chrono;
 
-#define __DEBUG 0
+#define __DEBUG 1
 #define __DUMP 1
 #define __IP_FILE_NAME 1
 

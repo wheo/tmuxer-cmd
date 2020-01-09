@@ -212,7 +212,11 @@ bool CMux::Muxing()
 				{
 					m_is_intra = true;
 				}
+#if 0
 				if (m_is_intra == true)
+#else
+				if (true)
+#endif
 				{
 					fwrite(pPkt.data, 1, pPkt.size, es);
 					m_pMuxer->put_data(&pPkt);
