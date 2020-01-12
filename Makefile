@@ -41,6 +41,8 @@ endif
 ifeq ($(ARG.RELEASE), 1)
 	CFLAGS += -O2 -DNDEBUG
 	CPPFLAGS += -O2 -DNDEBUG
+	#CFLAGS += -Og -DNDEBUG
+	#CPPFLAGS += -Og -DNDEBUG
 	CONFIG = release
 else
 	CFLAGS += -Wall -DDEBUG -g

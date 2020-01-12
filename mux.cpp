@@ -37,11 +37,18 @@ bool CMux::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_type = info["type"].asString();
 	m_is_intra = false;
 
+	m_nFrameCount = 0;
+	m_nAudioCount = 0;
+
 	SetSocket();
 
 	if (m_type == "video")
 	{
 		m_pMuxer = new CTSMuxer();
+	}
+	else
+	{
+		m_pMuxer = NULL;
 	}
 
 	if (m_queue)
@@ -98,21 +105,23 @@ bool CMux::Muxing()
 	mux_cfg_s mux_cfg;
 	memset(&mux_cfg, 0x00, sizeof(mux_cfg_s));
 
+#if 0
 	int bit_state = m_attr["bit_state"].asInt();
 	int result = bit_state & (1 << m_nChannel);
 
+	cout << "[MUX.ch." << m_nChannel << "] bit_state : " << bit_state << ", result : " << result << endl;
+
 	string sub_dir_name;
 	string group_name;
+	sub_dir_name = m_attr["folder_name"].asString();
 
-	if (m_attr["folder_name"].asString().size() > 0)
-	{
-		sub_dir_name = m_attr["folder_name"].asString();
-	}
-	else
-	{
-		sub_dir_name = get_current_time_and_date();
-	}
-	if (m_attr["bit_state"].asString().size() > 0)
+	stringstream sstm;
+	sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel;
+	system(sstm.str().c_str());
+	// clear method is not working then .str("") correct
+	sstm.str("");
+
+	if (bit_state > 0)
 	{
 		cout << "channel : " << m_nChannel << ", bit state is " << bit_state << ", result : " << result << endl;
 		if (result < 1)
@@ -121,16 +130,18 @@ bool CMux::Muxing()
 			return false;
 		}
 	}
+#else
 	stringstream sstm;
-	sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel;
-	system(sstm.str().c_str());
-	// clear method is not working then .str("") correct
-	sstm.str("");
+	string sub_dir_name;
+	string group_name;
+	sub_dir_name = m_attr["folder_name"].asString();
+#endif
 
 	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/"
 		 << "meta.json";
 	group_name = sstm.str();
 	sstm.str("");
+
 #if __IP_FILE_NAME
 	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".mp4";
 #else
@@ -157,8 +168,6 @@ bool CMux::Muxing()
 
 	mux_cfg.output = 1;
 	mux_cfg.vid.codec = m_attr["codec"].asInt(); // 0 : H264, 1 : HEVC
-	//mux_cfg.vid.bitrate = 6000000;
-	//mux_cfg.vid.fps = m_info["fps"].asDouble();
 	int num = m_info["num"].asInt();
 	int den = m_info["den"].asInt();
 	mux_cfg.vid.num = num;
@@ -171,6 +180,8 @@ bool CMux::Muxing()
 	Json::Value meta;
 	Json::Value mux_files;
 
+	meta["filename"] = m_filename;
+	meta["channel"] = m_nChannel;
 	meta["codec"] = mux_cfg.vid.codec;
 	meta["fps"] = mux_cfg.vid.fps;
 	meta["width"] = mux_cfg.vid.width;
@@ -188,8 +199,17 @@ bool CMux::Muxing()
 
 	string channel;
 
-	FILE *es = fopen(m_es_name.c_str(), "wb");
-	FILE *pAudio = fopen(m_audio_name.c_str(), "wb");
+	FILE *es = NULL;
+	FILE *pAudio = NULL;
+
+#if __DEBUG
+	es = fopen(m_es_name.c_str(), "wb");
+#endif
+
+	if (m_type == "audio")
+	{
+		pAudio = fopen(m_audio_name.c_str(), "wb");
+	}
 
 	m_nRecSec = m_attr["rec_sec"].asInt();
 
@@ -212,13 +232,15 @@ bool CMux::Muxing()
 				{
 					m_is_intra = true;
 				}
-#if 0
+#if __INTRA_FRAME_ONLY
 				if (m_is_intra == true)
 #else
 				if (true)
 #endif
 				{
+#if __DEBUG
 					fwrite(pPkt.data, 1, pPkt.size, es);
+#endif
 					m_pMuxer->put_data(&pPkt);
 				}
 				m_queue->Ret(&pPkt);
@@ -234,7 +256,7 @@ bool CMux::Muxing()
 			{
 				m_nFrameCount++;
 #if __DEBUG
-				_d("current frame : %d\n", m_nFrameCount);
+				_d("[MUX.ch.%d] current frame : %d\n", m_nChannel, m_nFrameCount);
 #endif
 				int nDstFrame = (m_nRecSec + 1) * mux_cfg.vid.fps;
 				if (m_nFrameCount >= nDstFrame)
@@ -272,7 +294,9 @@ bool CMux::Muxing()
 					m_filename = sstm.str();
 					m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg);
 
+#if __DEBUG
 					fclose(es);
+#endif
 					m_is_intra = false;
 
 					mux_files["name"] = final_filename;
@@ -287,7 +311,9 @@ bool CMux::Muxing()
 					sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".es";
 #endif
 					m_es_name = sstm.str();
+#if __DEBUG
 					es = fopen(m_es_name.c_str(), "wb");
+#endif
 				}
 			}
 		}
@@ -301,7 +327,7 @@ bool CMux::Muxing()
 			}
 			else
 			{
-				//cout << "[CMUX.ch" << m_nChannel << "] queue size is 0" << endl;
+				//cout << "[MUX.ch" << m_nChannel << "] queue size is 0" << endl;
 				continue;
 			}
 			if (m_nRecSec > 0)
@@ -357,11 +383,16 @@ bool CMux::Muxing()
 		}
 	}
 
-	fclose(es);
+	if (es)
+	{
+		fclose(es);
+	}
 
-	// 포인터 점검해야함
-	fclose(pAudio);
-	//cout << "[MUX.ch" << m_nChannel << "] loop out" << endl;
+	if (pAudio)
+	{
+		fclose(pAudio);
+	}
+	cout << "[MUX.ch" << m_nChannel << "] loop out" << endl;
 	return true;
 }
 
@@ -386,8 +417,11 @@ bool CMux::TX(char *buff, int size)
 
 void CMux::Delete()
 {
-	SAFE_DELETE(m_pMuxer);
+	if (m_pMuxer)
+	{
+		SAFE_DELETE(m_pMuxer);
+	}
 	//만약 m_queue를 삭제 안하면?
-	m_queue->Clear();
+	//m_queue->Clear();
 	//SAFE_DELETE(m_queue);
 }

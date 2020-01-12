@@ -37,7 +37,7 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_file_idx = 0;
 	m_Is_iframe = false;
 	m_frame_buf = new unsigned char[MAX_frame_size];
-	_d("[RECV.ch%d] alloc : %x\n", m_nChannel, m_frame_buf);
+	//_d("[RECV.ch%d] alloc : %x\n", m_nChannel, m_frame_buf);
 
 	if (!SetSocket())
 	{
@@ -47,6 +47,31 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	else
 	{
 		cout << "[RECV.ch" << m_nChannel << "] SetSocket() is succeed" << endl;
+	}
+
+	int bit_state = m_attr["bit_state"].asInt();
+	int result = bit_state & (1 << m_nChannel);
+
+	cout << "[MUX.ch." << m_nChannel << "] bit_state : " << bit_state << ", result : " << result << endl;
+
+	string sub_dir_name;
+	string group_name;
+	sub_dir_name = m_attr["folder_name"].asString();
+
+	stringstream sstm;
+	sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel;
+	system(sstm.str().c_str());
+	// clear method is not working then .str("") correct
+	sstm.str("");
+
+	if (bit_state > 0)
+	{
+		cout << "channel : " << m_nChannel << ", bit state is " << bit_state << ", result : " << result << endl;
+		if (result < 1)
+		{
+			cout << "channel " << m_nChannel << " is not use anymore" << endl;
+			return false;
+		}
 	}
 
 	m_queue = new CQueue();
@@ -96,17 +121,17 @@ bool CRecv::SetSocket()
 		return false;
 	}
 
-	if (-1 == bind(m_sock, (struct sockaddr *)&mcast_group, sizeof(mcast_group)))
-	{
-		perror("[RECV] bind error");
-		return false;
-	}
-
 	uint reuse = 1;
 	state = setsockopt(m_sock, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse));
 	if (state < 0)
 	{
 		perror("[RECV] Setting SO_REUSEADDR error\n");
+		return false;
+	}
+
+	if (-1 == bind(m_sock, (struct sockaddr *)&mcast_group, sizeof(mcast_group)))
+	{
+		perror("[RECV] bind error");
 		return false;
 	}
 
@@ -192,12 +217,6 @@ bool CRecv::Receive()
 		}
 		else if (m_info["type"].asString() == "video")
 		{
-#if 0
-			if (m_info["type"].asString() == "video")
-			{
-				continue;
-			}
-#endif
 			memcpy(&recv_nTotalStreamSize, buff_rcv, sizeof(recv_nTotalStreamSize));
 			memcpy(&recv_nCurStreamSize, buff_rcv + 4, sizeof(recv_nCurStreamSize));
 			memcpy(&nTotalPacketNum, buff_rcv + 8, sizeof(nTotalPacketNum));
@@ -272,8 +291,8 @@ bool CRecv::Receive()
 void CRecv::Delete()
 {
 	close(m_sock);
-	SAFE_DELETE(m_mux);
 #if __DEBUG
-	cout << "sock " << m_sock << " closed" << endl;
+	cout << "[RECV.ch" << m_nChannel << "] sock " << m_sock << " is closed" << endl;
 #endif
+	SAFE_DELETE(m_mux);
 }

@@ -47,9 +47,6 @@ private:
 	int m_nReadAudioPos;
 	int m_nWriteAudioPos;
 
-	int m_nReadFramePos;
-	int m_nWriteFramePos;
-
 	int m_nChannel;
 	string m_type;
 

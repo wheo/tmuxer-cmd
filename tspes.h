@@ -46,10 +46,10 @@ static const unsigned int crc_table[256] = {
 	0xea23f0af, 0xeee2ed18, 0xf0a5bd1d, 0xf464a0aa, 0xf9278673, 0xfde69bc4,
 	0x89b8fd09, 0x8d79e0be, 0x803ac667, 0x84fbdbd0, 0x9abc8bd5, 0x9e7d9662,
 	0x933eb0bb, 0x97ffad0c, 0xafb010b1, 0xab710d06, 0xa6322bdf, 0xa2f33668,
-	0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4
-};
+	0xbcb4666d, 0xb8757bda, 0xb5365d03, 0xb1f740b4};
 
-typedef struct {
+typedef struct
+{
 	int index;
 	int media;
 	int pid;
@@ -75,9 +75,10 @@ typedef struct {
 	int size;
 	int flags;
 	int duration;
-}es_s;
+} es_s;
 
-typedef struct {
+typedef struct
+{
 	uint8_t *p;
 	int size;
 
@@ -87,9 +88,10 @@ typedef struct {
 	int index;
 	int flags;
 	int duration;
-}pes_s;
+} pes_s;
 
-class CPES {
+class CPES
+{
 public:
 	CPES(void);
 	~CPES(void);
@@ -101,32 +103,36 @@ public:
 	pes_s *Get();
 
 	int WriteHeader(void *p, int nPID, int *pCC);
-	
+
 	bool WriteVideoPES(void *p, int nRemain, int &nResidu);
 	bool WriteAudioPES(void *p, int nRemain, int &nResidu);
 
 	int64_t GetNextPTS();
 
-	bool IsCorrupt() {
-		if (m_pkt.flags & 0x2) {
+	bool IsCorrupt()
+	{
+		if (m_pkt.flags & 0x2)
+		{
 			return true;
 		}
 		return false;
 	};
-	bool IsEOF(int nRemain) {
+	bool IsEOF(int nRemain)
+	{
 		int nLocalRemain = m_pkt.size - m_nWritten;
-		if (nLocalRemain > (nRemain - 8) && nLocalRemain <= 184) {
+		if (nLocalRemain > (nRemain - 8) && nLocalRemain <= 184)
+		{
 			return true;
 		}
 		return false;
 	};
 
-	bool IsFirst() {
+	bool IsFirst()
+	{
 		return m_bIsHeader;
 	};
 
 protected:
-
 	bool m_bIsHeader;
 
 	int m_nWritten;

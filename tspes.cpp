@@ -1,79 +1,91 @@
 #include "tspes.h"
 
-#define MAX_PTS					8589934591
+#define MAX_PTS 8589934591
 
-const uint8_t *avpriv_find_start_code(const uint8_t *p,
-		const uint8_t *end,
-		uint32_t *state)
+const uint8_t *avpriv_find_start_code(const uint8_t *p, const uint8_t *end, uint32_t *state)
 {
 	int i;
 
 	if (p >= end)
 		return end;
 
-	for (i = 0; i < 3; i++) {
+	for (i = 0; i < 3; i++)
+	{
 		uint32_t tmp = *state << 8;
 		*state = tmp + *(p++);
 		if (tmp == 0x100 || p == end)
 			return p;
 	}
 
-	while (p < end) {
-		if      (p[-1] > 1      ) p += 3;
-		else if (p[-2]          ) p += 2;
-		else if (p[-3]|(p[-1]-1)) p++;
-		else {
+	while (p < end)
+	{
+		if (p[-1] > 1)
+			p += 3;
+		else if (p[-2])
+			p += 2;
+		else if (p[-3] | (p[-1] - 1))
+			p++;
+		else
+		{
 			p++;
 			break;
 		}
 	}
 
 	p = FFMIN(p, end) - 4;
-	#if 0
+#if 0
 	*state = AV_RB32(p);
-	#endif
+#endif
 
 	return p + 4;
 }
 
-CPES::CPES(void) {
+CPES::CPES(void)
+{
 	m_bIsHeader = true;
 
 	m_nWritten = 0;
 	memset(&m_pkt, 0, sizeof(pes_s));
 }
 
-CPES::~CPES(void) {
+CPES::~CPES(void)
+{
 	pes_s *pp = &m_pkt;
-	if (pp->p) {
+	if (pp->p)
+	{
 		//_d("free > %x : %x\n", this, pp->p);
 		free(pp->p);
 	}
 }
 
-void CPES::Update() {
+void CPES::Update()
+{
 	pes_s *pp = &m_pkt;
-	double fRatio = (double)m_nWritten/pp->size; // max 1.0
-	pp->dts = pp->pts = m_nPTS + fRatio*pp->duration;
-	if (pp->dts > MAX_PTS) {
+	double fRatio = (double)m_nWritten / pp->size; // max 1.0
+	pp->dts = pp->pts = m_nPTS + fRatio * pp->duration;
+	if (pp->dts > MAX_PTS)
+	{
 		_d("[MUX] Rollover occur @ update (%ld)\n", pp->dts);
 		pp->dts -= MAX_PTS;
 		pp->pts = pp->dts;
 	}
-//	_d("[MUX] update pts %ld\n", pp->pts);
+	//	_d("[MUX] update pts %ld\n", pp->pts);
 }
 
-int64_t CPES::GetNextPTS() {
+int64_t CPES::GetNextPTS()
+{
 	pes_s *pp = &m_pkt;
 	int64_t pts = m_nPTS + pp->duration;
-	if (pts > MAX_PTS) {
+	if (pts > MAX_PTS)
+	{
 		_d("[MUX] Rollover occur @ delete (%ld)\n", pts);
 		pts -= MAX_PTS;
 	}
 	return pts;
 }
 
-void CPES::Set(es_s *pesi) {
+void CPES::Set(es_s *pesi)
+{
 	pes_s *pp = &m_pkt;
 
 	pp->p = (uint8_t *)malloc(pesi->size);
@@ -86,11 +98,12 @@ void CPES::Set(es_s *pesi) {
 
 	//_d("malloc > %s : %x\n", this, pp->p);
 	m_nPTS = pp->pts;
-	
+
 	memcpy(pp->p, pesi->payload, pesi->size);
 }
 
-void CPES::Set(AVFormatContext *s, AVPacket *pkt) {
+void CPES::Set(AVFormatContext *s, AVPacket *pkt)
+{
 	AVStream *st = s->streams[pkt->stream_index];
 	pes_s *pp = &m_pkt;
 
@@ -197,11 +210,13 @@ void CPES::Set(AVFormatContext *s, AVPacket *pkt) {
 	pp->flags = pkt->flags;
 }
 
-pes_s *CPES::Get() {
+pes_s *CPES::Get()
+{
 	return &m_pkt;
 }
 
-int CPES::WriteHeader(void *p, int nPID, int *pCC) {
+int CPES::WriteHeader(void *p, int nPID, int *pCC)
+{
 	uint8_t *pd = (uint8_t *)p;
 
 	int nCC = *pCC;
@@ -212,7 +227,8 @@ int CPES::WriteHeader(void *p, int nPID, int *pCC) {
 	pd[3] = (0x0 << 6 | 0x0 << 4 | nCC);
 
 	nCC++;
-	if (nCC >= 16) {
+	if (nCC >= 16)
+	{
 		nCC = 0;
 	}
 	*pCC = nCC;
@@ -220,7 +236,8 @@ int CPES::WriteHeader(void *p, int nPID, int *pCC) {
 	return 4;
 }
 
-bool CPES::WriteVideoPES(void *p, int nRemain, int &nResidu) {
+bool CPES::WriteVideoPES(void *p, int nRemain, int &nResidu)
+{
 	int nPesHeader = 0;
 	uint8_t ph[64];
 	uint8_t *pd1 = ph;
@@ -229,10 +246,12 @@ bool CPES::WriteVideoPES(void *p, int nRemain, int &nResidu) {
 	pes_s *pp = &m_pkt;
 
 	nResidu = 0;
-	if (m_bIsHeader) {
+	if (m_bIsHeader)
+	{
 		int pes_len = 5;
 		uint8_t pts_dts_flag = 0x2;
-		if (pp->dts != AV_NOPTS_VALUE && pp->pts != pp->dts) {
+		if (pp->dts != AV_NOPTS_VALUE && pp->pts != pp->dts)
+		{
 			pts_dts_flag = 0x3;
 			pes_len = 10;
 		}
@@ -243,67 +262,78 @@ bool CPES::WriteVideoPES(void *p, int nRemain, int &nResidu) {
 		*pd1++ = 0xE0; // video type
 		*pd1++ = 0x00;
 		*pd1++ = 0x00;
-		*pd1++ = (0x2 << 6 | // fixed
-				  0x0 << 4 | // PES scrambling
-				  0x0 << 3 | // PES priority
-				  0x1 << 2 | // Data align
-				  0x0 << 1 | // copyright
-				  0x0);		 // original
+		*pd1++ = (0x2 << 6 |		  // fixed
+				  0x0 << 4 |		  // PES scrambling
+				  0x0 << 3 |		  // PES priority
+				  0x1 << 2 |		  // Data align
+				  0x0 << 1 |		  // copyright
+				  0x0);				  // original
 		*pd1++ = (pts_dts_flag << 6 | //PTS_DTS_flag
-				  0x0 << 5 | // EPCR flag
-				  0x0 << 4 | // ES_rate flag
-				  0x0 << 3 | // DSM trick mode flag
-				  0x0 << 2 | // additional copy info
-				  0x0 << 1 | // PES_crc flag
-				  0x0);		 // PES extension flag
+				  0x0 << 5 |		  // EPCR flag
+				  0x0 << 4 |		  // ES_rate flag
+				  0x0 << 3 |		  // DSM trick mode flag
+				  0x0 << 2 |		  // additional copy info
+				  0x0 << 1 |		  // PES_crc flag
+				  0x0);				  // PES extension flag
 		*pd1++ = pes_len;
 
-		*pd1++ = (pts_dts_flag << 4 | 	// PTS_DTS_flag
-				  pp->pts >> 29 | 	// upper 3bits
-				  0x1); 	  			// MARKER
+		*pd1++ = (pts_dts_flag << 4 | // PTS_DTS_flag
+				  pp->pts >> 29 |	 // upper 3bits
+				  0x1);				  // MARKER
 
-		*pd1++ = ((pp->pts >> 22)&0xff);
-		*pd1++ = ((pp->pts >> 14)&0xfe) | 0x1;
-		*pd1++ = ((pp->pts >> 7)&0xff);
-		*pd1++ = ((pp->pts << 1)&0xfe) | 0x1;
+		*pd1++ = ((pp->pts >> 22) & 0xff);
+		*pd1++ = ((pp->pts >> 14) & 0xfe) | 0x1;
+		*pd1++ = ((pp->pts >> 7) & 0xff);
+		*pd1++ = ((pp->pts << 1) & 0xfe) | 0x1;
 
-		if (pts_dts_flag == 0x3) {
+		if (pts_dts_flag == 0x3)
+		{
 			*pd1++ = (0x1 << 4 | (pp->dts >> 29) | 0x1);
-			*pd1++ = ((pp->dts >> 22)&0xff);
-			*pd1++ = ((pp->dts >> 14)&0xfe) | 0x1;
-			*pd1++ = ((pp->dts >> 7)&0xff);
-			*pd1++ = ((pp->dts << 1)&0xfe) | 0x1;
+			*pd1++ = ((pp->dts >> 22) & 0xff);
+			*pd1++ = ((pp->dts >> 14) & 0xfe) | 0x1;
+			*pd1++ = ((pp->dts >> 7) & 0xff);
+			*pd1++ = ((pp->dts << 1) & 0xfe) | 0x1;
 		}
 		nPesHeader = (int)(pd1 - ph);
 	}
 
 	uint8_t *pd = (uint8_t *)p;
-	if (nRemain) {
+	if (nRemain)
+	{
 		int nDiff = pp->size - m_nWritten;
-		if (m_bIsHeader) {
+		if (m_bIsHeader)
+		{
 			nDiff += nPesHeader;
 		}
 
-		if ((nRemain - nDiff) == 1 || (nRemain - nDiff) == 2) {
+		if ((nRemain - nDiff) == 1 || (nRemain - nDiff) == 2)
+		{
 			int w = 32;
-			if (m_bIsHeader) {
+			if (m_bIsHeader)
+			{
 				memcpy(&pd[w], ph, nPesHeader);
 				w += nPesHeader;
 			}
 			memcpy(&pd[w], &ps[m_nWritten], (188 - w));
-			m_nWritten += (188-w);
-			nResidu = (188-w);
-		} else if (nDiff < nRemain) { 
+			m_nWritten += (188 - w);
+			nResidu = (188 - w);
+		}
+		else if (nDiff < nRemain)
+		{
 			nResidu = nDiff;
-			if (m_bIsHeader) {
-				memcpy(&pd[188-nDiff], ph, nPesHeader);
+			if (m_bIsHeader)
+			{
+				memcpy(&pd[188 - nDiff], ph, nPesHeader);
 				nDiff -= nPesHeader;
 			}
-			memcpy(&pd[188-nDiff], &ps[m_nWritten], nDiff);
+			memcpy(&pd[188 - nDiff], &ps[m_nWritten], nDiff);
 			m_nWritten += nDiff;
-		} else {
+		}
+		else
+		{
 			pd += (188 - nRemain);
-			if (m_bIsHeader) {
+			if (m_bIsHeader)
+			{
 				memcpy(pd, ph, nPesHeader);
 				pd += nPesHeader;
 				nRemain -= nPesHeader;
@@ -313,31 +343,35 @@ bool CPES::WriteVideoPES(void *p, int nRemain, int &nResidu) {
 		}
 	}
 	m_bIsHeader = false;
-	if (m_nWritten >= pp->size) {
+	if (m_nWritten >= pp->size)
+	{
 		return true;
 	}
 
 	return false;
 }
 
-bool CPES::WriteAudioPES(void *p, int nRemain, int &nResidu) {
+bool CPES::WriteAudioPES(void *p, int nRemain, int &nResidu)
+{
 	uint8_t *pd = (uint8_t *)p;
 	uint8_t *ps = (uint8_t *)m_pkt.p;
 
 	pes_s *pp = &m_pkt;
 
-	if (m_bIsHeader) {
+	if (m_bIsHeader)
+	{
 		int nPacketLen = pp->size + 8; // include PES header len
-		uint8_t type = 0xBD; // AC3 : 0xBD, AAC : 0xC0
-		if (ps[0] == 0xff && (ps[1] & 0xf0) == 0xf0) {
-			type = 0xC0 + (pp->index-1);
+		uint8_t type = 0xBD;		   // AC3 : 0xBD, AAC : 0xC0
+		if (ps[0] == 0xff && (ps[1] & 0xf0) == 0xf0)
+		{
+			type = 0xC0 + (pp->index - 1);
 		}
 
 		*pd++ = 0x00;
 		*pd++ = 0x00;
 		*pd++ = 0x01;
 		*pd++ = type;
-		*pd++ = ((nPacketLen >> 8)&0xff);
+		*pd++ = ((nPacketLen >> 8) & 0xff);
 		*pd++ = ((nPacketLen & 0xff));
 		*pd++ = (0x2 << 6 | // fixed
 				 0x0 << 4 | // PES scrambling
@@ -352,37 +386,44 @@ bool CPES::WriteAudioPES(void *p, int nRemain, int &nResidu) {
 				 0x0 << 2 | // additional copy info
 				 0x0 << 1 | // PES_crc flag
 				 0x0);		// PES extension flag
-		*pd++ = 5; // PES header data length
+		*pd++ = 5;			// PES header data length
 
-		*pd++ = (0x2 << 4 | // PTS_DTS_flag
+		*pd++ = (0x2 << 4 |		 // PTS_DTS_flag
 				 pp->pts >> 29 | // upper 3bits
-				 0x1);		// MARKER
+				 0x1);			 // MARKER
 
-		*pd++ = ((pp->pts >> 22)&0xff);
-		*pd++ = ((pp->pts >> 14)&0xfe) | 0x1;
-		*pd++ = ((pp->pts >> 7)&0xff);
-		*pd++ = ((pp->pts << 1)&0xfe) | 0x1;
+		*pd++ = ((pp->pts >> 22) & 0xff);
+		*pd++ = ((pp->pts >> 14) & 0xfe) | 0x1;
+		*pd++ = ((pp->pts >> 7) & 0xff);
+		*pd++ = ((pp->pts << 1) & 0xfe) | 0x1;
 
-		nRemain -= (int)(pd - (uint8_t*)p);
+		nRemain -= (int)(pd - (uint8_t *)p);
 		m_bIsHeader = false;
 	}
 
 	nResidu = 0;
-	if (nRemain) {
+	if (nRemain)
+	{
 		int nLocalSize = 0;
 		int nDiff = (pp->size - m_nWritten);
-		if (nDiff < nRemain) { 
+		if (nDiff < nRemain)
+		{
 			// 183 < 184 이면 nResidu 는 1 이 경우 buff[5] = 0 이 되며 syntax error가 난다.
 			// 따라서 nDiff가 183이면 93 + 90 처럼 둘로 나누자.
-			if (nDiff == 183) {
+			if (nDiff == 183)
+			{
 				//_d("[MUX] AUDIO > cut the PAYLOAD two\n");
 				nLocalSize = 93;
 				nResidu = nRemain - 93;
-			} else {
+			}
+			else
+			{
 				nResidu = nRemain - nDiff;
 				nLocalSize = nDiff;
 			}
-		} else {
+		}
+		else
+		{
 			nLocalSize = nRemain;
 		}
 
@@ -390,56 +431,56 @@ bool CPES::WriteAudioPES(void *p, int nRemain, int &nResidu) {
 		m_nWritten += nLocalSize;
 	}
 
-	if (m_nWritten >= pp->size) {
+	if (m_nWritten >= pp->size)
+	{
 		return true;
 	}
 
 	return false;
 }
 
-int PutPCR(void *p, uint64_t pcr_base, int pcr_ext, bool isDiscPCR, bool isIDR) {
+int PutPCR(void *p, uint64_t pcr_base, int pcr_ext, bool isDiscPCR, bool isIDR)
+{
 	uint8_t *pd = (uint8_t *)p;
 
-	pd[0] = 0x07; // ad field length
+	pd[0] = 0x07;			  // ad field length
 	pd[1] = (isDiscPCR << 7 | // discontinuity indicator
-			 isIDR << 6 | // random access indicator
-			 0x0 << 5 | // ES priority indicator
-			 0x1 << 4 | // PCR flag
-			 0x0 << 3 | // OPCR flag
-			 0x0 << 2 | // splicing point flag
-			 0x0 << 1 | // ts private data flag
-			 0x0); 		// ad extension flag
-	pd[2] = (pcr_base >> 25)&0xff;
-	pd[3] = (pcr_base >> 17)&0xff;
-	pd[4] = (pcr_base >> 9)&0xff;
-	pd[5] = (pcr_base >> 1)&0xff;
-	pd[6] = 0x7e | ((pcr_base&0x1) << 7 | ((pcr_ext >> 8) & 0x1));
+			 isIDR << 6 |	 // random access indicator
+			 0x0 << 5 |		  // ES priority indicator
+			 0x1 << 4 |		  // PCR flag
+			 0x0 << 3 |		  // OPCR flag
+			 0x0 << 2 |		  // splicing point flag
+			 0x0 << 1 |		  // ts private data flag
+			 0x0);			  // ad extension flag
+	pd[2] = (pcr_base >> 25) & 0xff;
+	pd[3] = (pcr_base >> 17) & 0xff;
+	pd[4] = (pcr_base >> 9) & 0xff;
+	pd[5] = (pcr_base >> 1) & 0xff;
+	pd[6] = 0x7e | ((pcr_base & 0x1) << 7 | ((pcr_ext >> 8) & 0x1));
 	pd[7] = (pcr_ext & 0xff);
 
 	return 8;
 }
 
-int PutPCROnly(void *p, uint64_t pcr_base, int pcr_ext, bool isDiscPCR) {
+int PutPCROnly(void *p, uint64_t pcr_base, int pcr_ext, bool isDiscPCR)
+{
 	uint8_t *pd = (uint8_t *)p;
 
-	pd[0] = 0x07; // ad field length
+	pd[0] = 0x07;			  // ad field length
 	pd[1] = (isDiscPCR << 7 | // discontinuity indicator
-			 0x0 << 6 | // random access indicator
-			 0x0 << 5 | // ES priority indicator
-			 0x1 << 4 | // PCR flag
-			 0x0 << 3 | // OPCR flag
-			 0x0 << 2 | // splicing point flag
-			 0x0 << 1 | // ts private data flag
-			 0x0); 		// ad extension flag
-	pd[2] = (pcr_base >> 25)&0xff;
-	pd[3] = (pcr_base >> 17)&0xff;
-	pd[4] = (pcr_base >> 9)&0xff;
-	pd[5] = (pcr_base >> 1)&0xff;
-	pd[6] = 0x7e | ((pcr_base&0x1) << 7 | ((pcr_ext >> 8) & 0x1));
+			 0x0 << 6 |		  // random access indicator
+			 0x0 << 5 |		  // ES priority indicator
+			 0x1 << 4 |		  // PCR flag
+			 0x0 << 3 |		  // OPCR flag
+			 0x0 << 2 |		  // splicing point flag
+			 0x0 << 1 |		  // ts private data flag
+			 0x0);			  // ad extension flag
+	pd[2] = (pcr_base >> 25) & 0xff;
+	pd[3] = (pcr_base >> 17) & 0xff;
+	pd[4] = (pcr_base >> 9) & 0xff;
+	pd[5] = (pcr_base >> 1) & 0xff;
+	pd[6] = 0x7e | ((pcr_base & 0x1) << 7 | ((pcr_ext >> 8) & 0x1));
 	pd[7] = (pcr_ext & 0xff);
 
 	return 8;
 }
-
-
-

@@ -93,7 +93,7 @@ void CCore::Run()
 {
 	while (!m_bExit)
 	{
-#if __DEBUG
+#if __DEFRECATED
 		cout << "[CORE] Thread is alive" << endl;
 #endif
 		sleep(1);
