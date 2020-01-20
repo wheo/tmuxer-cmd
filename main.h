@@ -49,7 +49,7 @@ using namespace chrono;
 #define __DEBUG 0
 #define __DUMP 0
 #define __IP_FILE_NAME 1
-#define __INTRA_FRAME_ONLY 1
+#define __INTRA_FRAME_FIRST 0
 
 #include "misc.h"
 

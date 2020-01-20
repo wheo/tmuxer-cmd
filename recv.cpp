@@ -25,10 +25,6 @@ CRecv::~CRecv(void)
 	pthread_mutex_destroy(&m_mutex_recv);
 }
 
-void CRecv::log(int type, int state)
-{
-}
-
 bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 {
 	m_info = info;
@@ -37,6 +33,7 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_file_idx = 0;
 	m_Is_iframe = false;
 	m_frame_buf = new unsigned char[MAX_frame_size];
+	m_pts = 0;
 	//_d("[RECV.ch%d] alloc : %x\n", m_nChannel, m_frame_buf);
 
 	if (!SetSocket())
@@ -54,15 +51,23 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 
 	cout << "[MUX.ch." << m_nChannel << "] bit_state : " << bit_state << ", result : " << result << endl;
 
-	string sub_dir_name;
+	string file_dst = m_attr["file_dst"].asString();
+	string sub_dir_name = m_attr["folder_name"].asString();
 	string group_name;
-	sub_dir_name = m_attr["folder_name"].asString();
+	string type = m_info["type"].asString();
 
 	stringstream sstm;
-	sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel;
+	sstm << "mkdir -p " << file_dst << "/" << sub_dir_name << "/" << m_nChannel;
 	system(sstm.str().c_str());
 	// clear method is not working then .str("") correct
 	sstm.str("");
+
+	sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/"
+		 << "meta.json";
+	group_name = sstm.str();
+	sstm.str("");
+
+	Json::Value meta;
 
 	if (bit_state > 0)
 	{
@@ -70,18 +75,25 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 		if (result < 1)
 		{
 			cout << "channel " << m_nChannel << " is not use anymore" << endl;
+			meta["filename"] = "";
+			meta["channel"] = m_nChannel;
+			meta["type"] = m_type;
+			meta["num"] = m_info["num"].asInt();
+			meta["den"] = m_info["den"].asInt();
+			CreateMetaJson(meta, group_name);
 			return false;
 		}
 	}
 
 	m_queue = new CQueue();
-	m_queue->SetInfo(m_nChannel, m_info["type"].asString());
+	m_queue->SetInfo(m_nChannel, type);
+
+	Start();
 	//m_queue->Enable();
 	m_mux = new CMux();
 	m_mux->SetQueue(&m_queue, m_nChannel);
 	m_mux->Create(info, attr, m_nChannel);
 
-	Start();
 	return true;
 }
 
@@ -107,11 +119,13 @@ bool CRecv::SetSocket()
 	struct ip_mreq mreq;
 
 	int state;
+	string ip = m_info["ip"].asString();
+	int port = m_info["port"].asInt();
 
 	memset(&mcast_group, 0x00, sizeof(mcast_group));
 	mcast_group.sin_family = AF_INET;
-	mcast_group.sin_port = htons(m_info["port"].asInt());
-	mcast_group.sin_addr.s_addr = inet_addr(m_info["ip"].asString().c_str());
+	mcast_group.sin_port = htons(port);
+	mcast_group.sin_addr.s_addr = inet_addr(ip.c_str());
 	//mcast_group.sin_addr.s_addr = inet_addr(INADDR_ANY);
 
 	m_sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -119,6 +133,10 @@ bool CRecv::SetSocket()
 	{
 		_d("[RECV.ch.%d] socket creation error\n", m_nChannel);
 		return false;
+	}
+	else
+	{
+		_d("[RECV.ch.%d] socket creation (%d)\n", m_nChannel, m_sock);
 	}
 
 	uint reuse = 1;
@@ -136,7 +154,6 @@ bool CRecv::SetSocket()
 	}
 
 	mreq.imr_multiaddr = mcast_group.sin_addr;
-	//mreq.imr_multiaddr.s_addr = inet_addr(m_info["ip"].asString().c_str());
 	mreq.imr_interface.s_addr = htonl(INADDR_ANY);
 
 	if (setsockopt(m_sock, IPPROTO_IP, IP_ADD_MEMBERSHIP, &mreq, sizeof(mreq)) < 0)
@@ -175,7 +192,14 @@ bool CRecv::Receive()
 	int nTotalPacketNum = 0;
 	int nCurPacketNum = 0;
 	int nPrevPacketNum = 0;
+#if 0
+	stringstream sstm;
+	sstm << "test_" << m_nChannel << ".hevc";
 
+	string dumpname = sstm.str();
+
+	FILE *es = fopen(dumpname.c_str(), "wb");
+#endif
 #if 0
 	mux_cfg_s mux_cfg;
 	memset(&mux_cfg, 0x00, sizeof(mux_cfg_s));
@@ -192,7 +216,6 @@ bool CRecv::Receive()
 	begin = high_resolution_clock::now();
 	while (!m_bExit)
 	{
-		/* code */
 		rd = recvfrom(m_sock, buff_rcv, PACKET_HEADER_SIZE + PACKET_SIZE, 0, NULL, 0);
 #if __DEBUG
 		_d("[RECV.ch%d] rd : %d\n", m_nChannel, rd);
@@ -255,27 +278,34 @@ bool CRecv::Receive()
 				_d("[RECV.ch%d] recv_nTotalStreamSize(%d)/recv_nestedStreamSize(%d)\n", m_nChannel, recv_nTotalStreamSize, recv_nestedStreamSize);
 				_d("[RECV.ch%d] 1 (%d) frame created\n", m_nChannel, recv_nestedStreamSize);
 #endif
+#if 0
+				fwrite(m_frame_buf, 1, recv_nestedStreamSize, es);
+#endif
 				AVPacket *pPkt;
+				//AVPacket pPkt;
 				pPkt = av_packet_alloc();
+				av_init_packet(pPkt);
+
+				m_pts += 1001;
 
 				pPkt->data = m_frame_buf;
 				pPkt->size = recv_nestedStreamSize;
-				//pPkt->pts = 1000;
+				pPkt->pts = m_pts;
 
 				if (recv_frame_type == 1)
 				{
 					pPkt->flags = AV_PKT_FLAG_KEY;
 				}
 
-				//_d("[RECV.ch%d][%lld] Putted !!!!! frame type : %d, pkt.flags : %d\n", m_nChannel, tick_diff, recv_frame_type, pPkt->flags);
-				m_queue->Put(pPkt);
 				end = high_resolution_clock::now();
 				tick_diff = duration_cast<microseconds>(end - begin).count();
+#if __DEBUG
+				_d("[RECV.ch%d][%lld] Putted !!!!! frame buf(%x), size : %d, type : %d, pkt.flags : %d\n", m_nChannel, tick_diff, pPkt->data, pPkt->size, recv_frame_type, pPkt->flags);
+#endif
+				m_queue->Put(pPkt);
 
 				begin = end;
 				tick_diff = 0;
-
-				av_packet_free(&pPkt);
 
 				recv_nestedStreamSize = 0;
 				nPrevPacketNum = 0;
@@ -284,15 +314,17 @@ bool CRecv::Receive()
 		//_d("write completed : %d(%d)\n", rd, fd);
 		//write(fd, buff_rcv, 16);
 	}
+#if 0
+	fclose(es);
+#endif
 	//cout << "[RECV] thread loop out" << endl;
 	return true;
 }
 
 void CRecv::Delete()
 {
-	close(m_sock);
-#if __DEBUG
+	close(m_sock); // release socket
 	cout << "[RECV.ch" << m_nChannel << "] sock " << m_sock << " is closed" << endl;
-#endif
 	SAFE_DELETE(m_mux);
+	m_mux = NULL;
 }

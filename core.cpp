@@ -41,8 +41,8 @@ bool CCore::Create(int type)
 		if (!m_reader.parse(ifs, m_root, true))
 		{
 			ifs.close();
-			_d("Failed to parse setting.json configuration\n%s\n", m_reader.getFormatedErrorMessages().c_str());
-			_d("[CORE.ch%d] Exit code\n");
+			_d("[CORE] Failed to parse setting.json configuration\n%s\n", m_reader.getFormatedErrorMessages().c_str());
+			_d("[CORE] Exit code\n");
 			exit(1);
 		}
 		else

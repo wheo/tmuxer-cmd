@@ -2,9 +2,9 @@
 #define _QUEUE_H_
 
 #define MAX_NUM_QUEUE 120
-#define MAX_NUM_AUDIO_QUEUE 1024
+#define MAX_NUM_AUDIO_QUEUE 128
 #define QUE_INFINITE -1
-#define MIN_BUF_FRAME 9
+#define MIN_BUF_FRAME 30
 
 class CQueue
 {
@@ -15,9 +15,10 @@ public:
 	void SetInfo(int nChannel, string type);
 	void Clear();
 
-	int Put(AVPacket *pkt);
+	bool Put(AVPacket *pkt);
 	int PutAudio(char *pData, int nSize);
 
+	bool IsNextKeyFrame();
 	int Get(AVPacket *pkt);
 	void *GetAudio();
 

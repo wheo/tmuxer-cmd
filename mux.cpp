@@ -39,6 +39,7 @@ bool CMux::Create(Json::Value info, Json::Value attr, int nChannel)
 
 	m_nFrameCount = 0;
 	m_nAudioCount = 0;
+	is_old_intra = false;
 
 	SetSocket();
 
@@ -105,6 +106,7 @@ bool CMux::Muxing()
 	mux_cfg_s mux_cfg;
 	memset(&mux_cfg, 0x00, sizeof(mux_cfg_s));
 
+// recv로 이동
 #if 0
 	int bit_state = m_attr["bit_state"].asInt();
 	int result = bit_state & (1 << m_nChannel);
@@ -132,37 +134,38 @@ bool CMux::Muxing()
 	}
 #else
 	stringstream sstm;
-	string sub_dir_name;
+	string sub_dir_name = m_attr["folder_name"].asString();
 	string group_name;
-	sub_dir_name = m_attr["folder_name"].asString();
+	string file_dst = m_attr["file_dst"].asString();
+	string ip_string = m_info["ip"].asString();
 #endif
 
-	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/"
+	sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/"
 		 << "meta.json";
 	group_name = sstm.str();
 	sstm.str("");
 
 #if __IP_FILE_NAME
-	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".mp4";
+	sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << ip_string << "_" << m_file_idx << ".mp4";
 #else
-	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".mp4";
+	sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".mp4";
 #endif
 	m_filename = sstm.str();
 	cout << "[MUX.ch." << m_nChannel << "] expected output file name : " << m_filename << endl;
 	sstm.str("");
 
 #if __IP_FILE_NAME
-	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".es";
+	sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << ip_string << "_" << m_file_idx << ".es";
 #else
-	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".es";
+	sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".es";
 #endif
 	m_es_name = sstm.str();
 	sstm.str("");
 
 #if __IP_FILE_NAME
-	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".audio";
+	sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << ip_string << "_" << m_file_idx << ".audio";
 #else
-	sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".audio";
+	sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".audio";
 #endif
 	m_audio_name = sstm.str();
 
@@ -175,6 +178,8 @@ bool CMux::Muxing()
 	mux_cfg.vid.fps = (double)den / (double)num;
 	mux_cfg.vid.width = m_info["width"].asInt();
 	mux_cfg.vid.height = m_info["height"].asInt();
+	mux_cfg.vid.max_gop = 30;
+
 	_d("[MUX.ch%d] fps : %.3f\n", m_nChannel, mux_cfg.vid.fps);
 
 	Json::Value meta;
@@ -223,27 +228,27 @@ bool CMux::Muxing()
 	{
 		if (m_type == "video" && !m_bExit)
 		{
-			AVPacket pPkt;
-			if (m_queue->Get(&pPkt) > 0)
+			AVPacket *pPkt;
+			pPkt = av_packet_alloc();
+			if (m_queue->Get(pPkt) > 0)
 			{
 				//es write
-				//_d("flag : %x\n", pPkt.flags);
-				if (pPkt.flags == AV_PKT_FLAG_KEY)
+				if (pPkt->flags == AV_PKT_FLAG_KEY)
 				{
 					m_is_intra = true;
 				}
-#if __INTRA_FRAME_ONLY
+#if __INTRA_FRAME_FIRST
 				if (m_is_intra == true)
 #else
 				if (true)
 #endif
 				{
 #if __DEBUG
-					fwrite(pPkt.data, 1, pPkt.size, es);
+					fwrite(pPkt->data, 1, pPkt->size, es);
 #endif
-					m_pMuxer->put_data(&pPkt);
+					m_pMuxer->put_data(pPkt);
 				}
-				m_queue->Ret(&pPkt);
+				m_queue->Ret(pPkt);
 			}
 			else
 			{
@@ -259,7 +264,7 @@ bool CMux::Muxing()
 				_d("[MUX.ch.%d] current frame : %d\n", m_nChannel, m_nFrameCount);
 #endif
 				int nDstFrame = (m_nRecSec + 1) * mux_cfg.vid.fps;
-				if (m_nFrameCount >= nDstFrame)
+				if (m_nFrameCount >= nDstFrame && m_queue->IsNextKeyFrame())
 				{
 					int finalFrameCount = 0;
 					finalFrameCount = m_nFrameCount;
@@ -287,9 +292,9 @@ bool CMux::Muxing()
 					m_pMuxer = new CTSMuxer();
 					sstm.str("");
 #if __IP_FILE_NAME
-					sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".mp4";
+					sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << ip_string << "_" << m_file_idx << ".mp4";
 #else
-					sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".mp4";
+					sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".mp4";
 #endif
 					m_filename = sstm.str();
 					m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg);
@@ -306,9 +311,9 @@ bool CMux::Muxing()
 
 					sstm.str("");
 #if __IP_FILE_NAME
-					sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".es";
+					sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << ip_string << "_" << m_file_idx << ".es";
 #else
-					sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".es";
+					sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".es";
 #endif
 					m_es_name = sstm.str();
 #if __DEBUG
@@ -320,7 +325,7 @@ bool CMux::Muxing()
 		else if (m_type == "audio" && !m_bExit)
 		{
 			ELEM *pe = (ELEM *)m_queue->GetAudio();
-			if (pe)
+			if (pe && pe->len > 0)
 			{
 				fwrite(pe->p, 1, pe->len, pAudio);
 				m_queue->RetAudio(pe);
@@ -372,7 +377,7 @@ bool CMux::Muxing()
 
 					sstm.str("");
 #if __IP_FILE_NAME
-					sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_info["ip"].asString() << "_" << m_file_idx << ".audio";
+					sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << ip_string << "_" << m_file_idx << ".audio";
 #else
 					sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".audio";
 #endif
@@ -406,22 +411,23 @@ bool CMux::TX(char *buff, int size)
 
 	struct sockaddr_in sin;
 	socklen_t sin_size = sizeof(sin);
+	string ip = m_attr["udp_target_ip"].asString();
+	int port = m_attr["udp_target_port"].asInt();
 
 	sin.sin_family = AF_INET;
-	sin.sin_addr.s_addr = inet_addr(m_attr["udp_target_ip"].asString().c_str());
-	sin.sin_port = htons(m_attr["udp_target_port"].asInt());
+	sin.sin_addr.s_addr = inet_addr(ip.c_str());
+	sin.sin_port = htons(port);
 
 	sendto(m_sdSend, buff, size, 0, (struct sockaddr *)&sin, sin_size);
-	cout << "[CMUX] ip : " << inet_ntoa(sin.sin_addr) << " port : " << m_attr["udp_target_port"].asInt() << ", send message : " << buff << endl;
+	cout << "[CMUX] ip : " << inet_ntoa(sin.sin_addr) << " port : " << port << ", send message : " << buff << endl;
 }
 
 void CMux::Delete()
 {
-	if (m_pMuxer)
-	{
-		SAFE_DELETE(m_pMuxer);
-	}
+
+	SAFE_DELETE(m_pMuxer);
+
 	//만약 m_queue를 삭제 안하면?
-	//m_queue->Clear();
-	//SAFE_DELETE(m_queue);
+	m_queue->Clear();
+	SAFE_DELETE(m_queue);
 }

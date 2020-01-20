@@ -41,17 +41,18 @@ bool CTSMuxer::CreateOutput(const char *strFilePath, mux_cfg_s *mux_cfg, int nRe
 	m_nRecSec = nRecSec;
 
 	AVOutputFormat *fmt;
-	AVDictionary *opt = NULL;
+	AVDictionary *opt = nullptr;
 	int ret;
 
 	memcpy(&m_mux_cfg, mux_cfg, sizeof(mux_cfg_s));
 
 	/* allocate the output media context */
-	avformat_alloc_output_context2(&m_poc_ctx, NULL, NULL, strFilePath);
+
+	avformat_alloc_output_context2(&m_poc_ctx, nullptr, nullptr, strFilePath);
 	if (!m_poc_ctx)
 	{
 		_d("[Muxer] Could not deduce output format from file extension: using MPEG.\n");
-		avformat_alloc_output_context2(&m_poc_ctx, NULL, "mpeg", strFilePath);
+		avformat_alloc_output_context2(&m_poc_ctx, nullptr, "mpeg", strFilePath);
 	}
 
 	if (!m_poc_ctx)
@@ -360,8 +361,12 @@ void CTSMuxer::put_data(unsigned char *pData, int nDataSize)
 void CTSMuxer::put_data(AVPacket *pkt)
 {
 	AVCodecContext *c = m_video_st.enc;
+#if 1
 	pkt->pts = m_nFrameCount;
 	pkt->dts = m_nFrameCount;
+#else
+	pkt->dts = pkt->pts;
+#endif
 
 	write_frame(m_poc_ctx, &c->time_base, m_video_st.st, pkt);
 

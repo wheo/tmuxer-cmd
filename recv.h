@@ -47,6 +47,7 @@ private:
 	int m_sock;
 	bool m_Is_iframe;
 	unsigned char *m_frame_buf;
+	uint64_t m_pts;
 
 	Json::Value json;
 

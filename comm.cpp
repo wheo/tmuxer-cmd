@@ -79,7 +79,6 @@ bool CCommMgr::ReadBuffer()
 
 	mux_cfg_s *mux_cfg;
 
-	Json::Reader reader;
 	Json::Value root;
 	string strbuf;
 	strbuf = (char *)m_RecvBuf;
@@ -115,12 +114,13 @@ bool CCommMgr::ReadBuffer()
                 nBuffSize += sizeof(strName);
                 _d("[COMM] received event filename : %s\n", strName);
 #endif
-				int bit_state = 0;
+				int bit_state = root["info"]["bit_state"].asInt();
 				int result = 0;
+				string file_name = root["info"]["file_name"].asString();
 
-				if (root["info"]["file_name"].asString().size() > 0)
+				if (file_name.size() > 0)
 				{
-					m_attr["folder_name"] = root["info"]["file_name"].asString();
+					m_attr["folder_name"] = file_name;
 				}
 				else
 				{
@@ -132,10 +132,8 @@ bool CCommMgr::ReadBuffer()
 					//cout << "file_name : " << root["info"]["file_name"].asString() << endl;
 					//cout << "m_attr[folder_name] : " << m_attr["folder_name"].asString() << endl;
 
-					if (root["info"]["bit_state"].asInt() > 0)
+					if (bit_state > 0)
 					{
-						//bit_state = m_attr["bit_state"].asInt();
-						bit_state = root["info"]["bit_state"].asInt();
 						m_attr["bit_state"] = bit_state;
 						//result = bit_state & (1 << m_nChannel);
 					}

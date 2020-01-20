@@ -51,6 +51,7 @@ private:
 
 	CTSMuxer *m_pMuxer;
 	CQueue *m_queue;
+	bool is_old_intra;
 
 	bool SetSocket();
 

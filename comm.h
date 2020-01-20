@@ -60,6 +60,7 @@ protected:
     pthread_mutex_t m_mutex_comm;
     char *m_RecvBuf;
     int m_rd_length;
+    Json::Reader reader;
 
 protected:
     //CCommCt *m_pCt[MAX_NUM_SIM_CLIENT];
