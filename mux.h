@@ -33,10 +33,14 @@ protected:
 private:
 	//mux_cfg_s m_mux_cfg;
 
-	int m_nRecSec;	 // 얼마나 녹화를 할 것인가
-	int m_nFrameCount; // 프레임 수
-	int m_nAudioCount; // 오디오 수
-	int m_file_idx;	// 파일 인덱스 번호
+	int m_nRecSec;			// 얼마나 녹화를 할 것인가
+	uint64_t m_nFrameCount; // 한 파일의 프레임
+	uint64_t m_nAudioCount; // 한 파일의 오디오
+
+	uint64_t m_nTotalFrameCount; // 전체 프레임
+	uint64_t m_nTotalAudioCount; // 전체 오디오
+
+	int m_file_idx; // 파일 인덱스 번호
 	int m_is_intra;
 	string m_filename;
 	string m_es_name;

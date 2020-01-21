@@ -23,8 +23,9 @@ private:
 	int m_nChannel;
 	Json::Value m_root;
 	Json::Reader m_reader;
+	int m_counter;
 
-    int m_type;
+	int m_type;
 
 	CCommMgr *m_comm;
 

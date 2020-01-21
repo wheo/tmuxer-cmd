@@ -34,11 +34,18 @@ CTSMuxer::~CTSMuxer()
 	DeleteOutput();
 }
 
-bool CTSMuxer::CreateOutput(const char *strFilePath, mux_cfg_s *mux_cfg, int nRecSec)
+bool CTSMuxer::CreateOutput(const char *strFilePath, mux_cfg_s *mux_cfg, uint64_t last_frame_count)
 {
 	DeleteOutput();
 
-	m_nRecSec = nRecSec;
+	//m_nRecSec = nRecSec;
+
+	if (last_frame_count > 0)
+	{
+		m_nFrameCount = last_frame_count;
+	}
+
+	_d("[Muxer] m_nFrameCount : %lld\n", m_nFrameCount);
 
 	AVOutputFormat *fmt;
 	AVDictionary *opt = nullptr;
@@ -117,30 +124,6 @@ bool CTSMuxer::CreateOutput(const char *strFilePath, mux_cfg_s *mux_cfg, int nRe
 		_d("[TSMUXER] Error occurred when opening output file: %s\n", strFilePath);
 		return 1;
 	}
-	m_nFrameCount = 0;
-
-#if 0
-	m_bsf = av_bsf_get_by_name("hevc_metadata");
-
-	if (av_bsf_alloc(m_bsf, &m_bsfc) < 0)
-	{
-		_d("[TSMUXER] Failed to alloc bsfc\n");
-		return false;
-	}
-	if (avcodec_parameters_copy(m_bsfc->par_in, m_poc_ctx->streams[0]->codecpar) < 0)
-	{
-		_d("[TSMUXER] Failed to copy codec param.\n");
-		return false;
-	}
-	m_bsfc->time_base_in = m_poc_ctx->streams[0]->time_base;
-
-	if (av_bsf_init(m_bsfc) < 0)
-	{
-		_d("[DEMUXER] Failed to init bsfc\n");
-		return false;
-	}
-#endif
-
 	return true;
 }
 
@@ -379,7 +362,11 @@ int CTSMuxer::write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base,
 	/* rescale output packet timestamp values from codec to stream timebase */
 	//	pkt->pts = av_rescale(g_frame_count, 12800, 25);
 	//	pkt->pts = av_compare_ts(g_frame_count, m_video_st.enc->time_base, STREAM_DURATION, )
+	//_d("before pts : %lld, src num : %d, src den : %d, dst num : %d, dst den : %d\n", pkt->pts, time_base->num, time_base->den, st->time_base.num, st->time_base.den);
+
 	av_packet_rescale_ts(pkt, *time_base, st->time_base);
+
+	//_d("after pts : %lld, src num : %d, src den : %d, dst num : %d, dst den : %d\n", pkt->pts, time_base->num, time_base->den, st->time_base.num, st->time_base.den);
 	pkt->stream_index = st->index;
 
 #if 0
@@ -391,9 +378,6 @@ int CTSMuxer::write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base,
 #else
 	pkt->dts = pkt->pts;
 #endif
-
-	//_d("[TSMUXER] time_base : %d/%d, pkt pts/dts : %lld/%lld\n", time_base->num, time_base->den, pkt->pts, pkt->dts);
-
 	/* Write the compressed frame to the media file. */
 	//log_packet(fmt_ctx, pkt);
 

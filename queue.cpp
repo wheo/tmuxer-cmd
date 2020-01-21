@@ -6,7 +6,7 @@ CQueue::CQueue()
 	m_nMaxQueue = MAX_NUM_QUEUE;
 	m_nMaxAudioQueue = MAX_NUM_AUDIO_QUEUE;
 
-#if 0
+#if 1
 	for (int i = 0; i < m_nMaxQueue; i++)
 	{
 		m_pkt[i] = av_packet_alloc();
@@ -38,6 +38,10 @@ CQueue::CQueue()
 
 CQueue::~CQueue()
 {
+	for (int i = 0; i < m_nMaxQueue; i++)
+	{
+		av_packet_free(&m_pkt[i]);
+	}
 	pthread_mutex_destroy(&m_mutex);
 }
 
@@ -86,9 +90,9 @@ bool CQueue::Put(AVPacket *pkt)
 		if (pkt->size > 0)
 		{
 			//m_pkt[m_nWritePos] = av_packet_alloc();
-			av_init_packet(&m_pkt[m_nWritePos]);
-			av_packet_ref(&m_pkt[m_nWritePos], pkt);
-			av_packet_unref(pkt);
+			av_init_packet(m_pkt[m_nWritePos]);
+			av_packet_ref(m_pkt[m_nWritePos], pkt);
+			//av_packet_unref(pkt);
 			//av_packet_free(&pkt);
 #if __DEBUG
 			_d("[QUEUE.ch%d] put pos : ( %d ), stream_index : %d, data ( %p ), size ( %d )\n", m_nChannel, m_nWritePos, m_pkt[m_nWritePos]->stream_index, m_pkt[m_nWritePos]->data, m_pkt[m_nWritePos]->size);
@@ -152,7 +156,12 @@ int CQueue::PutAudio(char *pData, int nSize)
 }
 bool CQueue::IsNextKeyFrame()
 {
-	if (m_pkt[m_nReadPos + 1].flags == AV_PKT_FLAG_KEY)
+	int target = m_nReadPos + 1;
+	if ((m_nReadPos + 1) >= m_nMaxQueue)
+	{
+		target = 0;
+	}
+	if (m_pkt[target]->flags == AV_PKT_FLAG_KEY)
 	{
 		return true;
 	}
@@ -176,13 +185,13 @@ int CQueue::Get(AVPacket *pkt)
 
 	pthread_mutex_lock(&m_mutex);
 
-	if (m_pkt[m_nReadPos].size > 0)
+	if (m_pkt[m_nReadPos]->size > 0)
 	{
 #if __DEBUG
 		cout << "[QUEUE.ch" << m_nChannel << "] m_nReadPos : " << m_nReadPos << ", size : " << m_pkt[m_nReadPos]->size << endl;
 #endif
 		//av_init_packet(pkt);
-		av_packet_ref(pkt, &m_pkt[m_nReadPos]);
+		av_packet_ref(pkt, m_pkt[m_nReadPos]);
 #if 0
 			if (m_nPacket < m_nDelay)
 			{
@@ -194,7 +203,7 @@ int CQueue::Get(AVPacket *pkt)
 		_d("[QUEUE.ch%d] get pos ( %d ), size ( %d ), data ( %p ),  pts ( %lld ), type : %d, m_nPacket : %d\n", m_nChannel, m_nReadPos, m_pkt[m_nReadPos]->size, m_pkt[m_nReadPos]->data,
 		   m_pkt[m_nReadPos]->pts, m_pkt[m_nReadPos]->stream_index, m_nPacket);
 #endif
-		av_packet_unref(&m_pkt[m_nReadPos]);
+		av_packet_unref(m_pkt[m_nReadPos]);
 		//av_packet_free(m_pkt[m_nReadPos]);
 		pthread_mutex_unlock(&m_mutex);
 		return pkt->size;
@@ -246,7 +255,6 @@ void CQueue::Ret(AVPacket *pkt)
 	pthread_mutex_lock(&m_mutex);
 
 	av_packet_unref(pkt);
-	av_packet_free(&pkt);
 
 	m_nReadPos++;
 #if __DEBUG

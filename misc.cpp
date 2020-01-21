@@ -36,6 +36,47 @@ bool CreateMetaJson(Json::Value json, string path)
 	cout << "[MISC] Create Json meta completed : " << path << endl;
 }
 
+bool AppendMetaJson(Json::Value json, string path)
+{
+	Json::Reader reader;
+	Json::Value json_root;
+	ifstream ifs(path, ifstream::binary);
+
+	if (!ifs.is_open())
+	{
+		cout << "[MISC] " << path << " file open error" << endl;
+		return false;
+	}
+	else
+	{
+		//check done
+		//ifs >> m_root;
+		if (!reader.parse(ifs, json_root, true))
+		{
+			ifs.close();
+			cout << "[MISC] Failed to parse " << path << endl
+				 << reader.getFormatedErrorMessages().c_str() << endl;
+			return false;
+		}
+		else
+		{
+			ifs.close();
+
+			json_root.append(json);
+			Json::StreamWriterBuilder builder;
+			builder["commentStyle"] = "None";
+			builder["indentation"] = "   "; // tab
+			std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
+			std::ofstream ofs(path);
+			writer->write(json_root, &ofs);
+			ofs.close();
+			cout << "[MISC] Append Json meta completed : " << path << endl;
+			return true;
+		}
+	}
+	return true;
+}
+
 double rnd(double x, int digit)
 {
 	return (floor((x)*pow(float(10), digit) + 0.5f) / pow(float(10), digit));

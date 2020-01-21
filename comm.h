@@ -39,6 +39,8 @@ public:
     bool Open(int nPort, Json::Value attr);
     bool Echo(char *buf);
     bool ReadBuffer();
+    bool Restart();
+    bool isRunning() { m_bIsRunning; }
 
 protected:
     void Run();
@@ -47,6 +49,8 @@ protected:
     bool SetSocket();
     bool RX();
     bool TX(char *buff, int size);
+    bool MuxStart();
+    bool MuxStop();
 
 protected:
     int m_nPort;
@@ -56,6 +60,7 @@ protected:
     bool m_bIsRunning;
     struct sockaddr_in m_sin;
     Json::Value m_attr;
+    Json::Value m_root;
     CRecv *m_CRecv[MAX_NUM_CHANNEL];
     pthread_mutex_t m_mutex_comm;
     char *m_RecvBuf;

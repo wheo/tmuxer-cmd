@@ -9,6 +9,7 @@ extern char __BUILD_NUMBER;
 CRecv::CRecv(void)
 {
 	m_bExit = false;
+	m_mux = NULL;
 	pthread_mutex_init(&m_mutex_recv, 0);
 }
 
@@ -281,28 +282,26 @@ bool CRecv::Receive()
 #if 0
 				fwrite(m_frame_buf, 1, recv_nestedStreamSize, es);
 #endif
-				AVPacket *pPkt;
-				//AVPacket pPkt;
-				pPkt = av_packet_alloc();
-				av_init_packet(pPkt);
+				AVPacket pkt;
+				av_init_packet(&pkt);
 
-				m_pts += 1001;
+				m_pts++;
 
-				pPkt->data = m_frame_buf;
-				pPkt->size = recv_nestedStreamSize;
-				pPkt->pts = m_pts;
+				pkt.data = m_frame_buf;
+				pkt.size = recv_nestedStreamSize;
+				pkt.pts = m_pts;
 
 				if (recv_frame_type == 1)
 				{
-					pPkt->flags = AV_PKT_FLAG_KEY;
+					pkt.flags = AV_PKT_FLAG_KEY;
 				}
 
 				end = high_resolution_clock::now();
 				tick_diff = duration_cast<microseconds>(end - begin).count();
 #if __DEBUG
-				_d("[RECV.ch%d][%lld] Putted !!!!! frame buf(%x), size : %d, type : %d, pkt.flags : %d\n", m_nChannel, tick_diff, pPkt->data, pPkt->size, recv_frame_type, pPkt->flags);
+				_d("[RECV.ch%d][%lld] Putted !!!!! frame buf(%x), size : %d, type : %d, pkt.flags : %d, pts :  %lld\n", m_nChannel, tick_diff, pkt.data, pkt.size, recv_frame_type, pkt.flags, pkt.pts);
 #endif
-				m_queue->Put(pPkt);
+				m_queue->Put(&pkt);
 
 				begin = end;
 				tick_diff = 0;

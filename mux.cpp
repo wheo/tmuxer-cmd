@@ -39,6 +39,9 @@ bool CMux::Create(Json::Value info, Json::Value attr, int nChannel)
 
 	m_nFrameCount = 0;
 	m_nAudioCount = 0;
+
+	m_nTotalFrameCount = 0;
+	m_nTotalAudioCount = 0;
 	is_old_intra = false;
 
 	SetSocket();
@@ -228,12 +231,12 @@ bool CMux::Muxing()
 	{
 		if (m_type == "video" && !m_bExit)
 		{
-			AVPacket *pPkt;
-			pPkt = av_packet_alloc();
-			if (m_queue->Get(pPkt) > 0)
+			AVPacket pkt;
+			av_init_packet(&pkt);
+			if (m_queue->Get(&pkt) > 0)
 			{
 				//es write
-				if (pPkt->flags == AV_PKT_FLAG_KEY)
+				if (pkt.flags == AV_PKT_FLAG_KEY)
 				{
 					m_is_intra = true;
 				}
@@ -246,9 +249,9 @@ bool CMux::Muxing()
 #if __DEBUG
 					fwrite(pPkt->data, 1, pPkt->size, es);
 #endif
-					m_pMuxer->put_data(pPkt);
+					m_pMuxer->put_data(&pkt);
 				}
-				m_queue->Ret(pPkt);
+				m_queue->Ret(&pkt);
 			}
 			else
 			{
@@ -260,6 +263,7 @@ bool CMux::Muxing()
 			if (m_nRecSec > 0)
 			{
 				m_nFrameCount++;
+				m_nTotalFrameCount++;
 #if __DEBUG
 				_d("[MUX.ch.%d] current frame : %d\n", m_nChannel, m_nFrameCount);
 #endif
@@ -297,7 +301,7 @@ bool CMux::Muxing()
 					sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".mp4";
 #endif
 					m_filename = sstm.str();
-					m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg);
+					m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg, m_nTotalFrameCount);
 
 #if __DEBUG
 					fclose(es);
@@ -338,6 +342,7 @@ bool CMux::Muxing()
 			if (m_nRecSec > 0)
 			{
 				m_nAudioCount++;
+				m_nTotalAudioCount++;
 #if __DEBUG
 				_d("current frame : %d\n", m_nFrameCount);
 #endif
@@ -429,5 +434,5 @@ void CMux::Delete()
 
 	//만약 m_queue를 삭제 안하면?
 	m_queue->Clear();
-	SAFE_DELETE(m_queue);
+	//SAFE_DELETE(m_queue);
 }

@@ -94,7 +94,7 @@ public:
 	CTSMuxer();
 	~CTSMuxer();
 
-	bool CreateOutput(const char *strFilePath, mux_cfg_s *mux_cfg, int nRecSec = -1);
+	bool CreateOutput(const char *strFilePath, mux_cfg_s *mux_cfg, uint64_t last_frame_count = 0);
 	void DeleteOutput();
 
 	void put_data(unsigned char *pData, int nDataSize);

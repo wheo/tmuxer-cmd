@@ -53,7 +53,7 @@ private:
 
 	pthread_mutex_t m_mutex;
 
-	AVPacket m_pkt[MAX_NUM_QUEUE];
+	AVPacket *m_pkt[MAX_NUM_QUEUE];
 	ELEM m_e[MAX_NUM_AUDIO_QUEUE];
 };
 

@@ -26,6 +26,7 @@ CCore::~CCore(void)
 
 bool CCore::Create(int type)
 {
+	m_counter = 0;
 	m_nChannel = 0;
 	m_type = type;
 	ifstream ifs("./setting.json", ifstream::binary);
@@ -81,7 +82,7 @@ bool CCore::Create(int type)
 			}
 #endif
 			m_comm = new CCommMgr();
-			m_comm->Open(attr["udp_muxer_port"][m_type].asInt(), attr);
+			m_comm->Open(m_root["udp_muxer_port"][m_type].asInt(), attr);
 		}
 	}
 
@@ -97,6 +98,28 @@ void CCore::Run()
 		cout << "[CORE] Thread is alive" << endl;
 #endif
 		sleep(1);
+		cout << "[CORE] " << m_root["make_folder_interval"].asUInt() << ", counter : " << m_counter << endl;
+		if (m_type == 0) // 상시녹화
+		{
+			if (m_comm->isRunning() == true)
+			{
+				m_counter++;
+			}
+
+			if (m_root["make_folder_interval"].asUInt() < m_root["rec_sec"].asUInt())
+			{
+				//not work
+			}
+			else
+			{
+				if (m_counter > m_root["make_folder_interval"].asUInt())
+				{
+					_d("[CORE] force Restart\n", m_counter);
+					m_comm->Restart();
+					m_counter = 0;
+				}
+			}
+		}
 	}
 	Delete();
 	_d("[CORE] Thread has been exited\n");

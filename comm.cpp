@@ -79,105 +79,20 @@ bool CCommMgr::ReadBuffer()
 
 	mux_cfg_s *mux_cfg;
 
-	Json::Value root;
+	//Json::Value root;
 	string strbuf;
 	strbuf = (char *)m_RecvBuf;
-	stringstream sstm;
 
-	if (reader.parse(strbuf, root, true))
+	if (reader.parse(strbuf, m_root, true))
 	{
 		//parse success
-		if (root["cmd"] == "save_start")
+		if (m_root["cmd"] == "save_start")
 		{
-			if (!m_bIsRunning)
-			{
-				m_bIsRunning = true;
-				m_nChannel = 0;
-#if 0
-                int nStructSize = sizeof(mux_cfg_s);
-                int nBuffSize = 0;
-                // buff[4] is enable bit 연산
-                nBuffSize += 5;
-
-                char *pData = &buff[5];
-                for (int i = 0; i < MAX_VIDEO_CHANNEL_COUNT; i++)
-                {
-                    //memcpy(pData, &mux_cfg[i], nStructSize);
-                    pData += nStructSize;
-                    nBuffSize += nStructSize;
-                }
-                //windows FILE_MAX_SIZE : 260
-                char strName[260] = {
-                    0,
-                };
-                memcpy(strName, pData, sizeof(strName));
-                nBuffSize += sizeof(strName);
-                _d("[COMM] received event filename : %s\n", strName);
-#endif
-				int bit_state = root["info"]["bit_state"].asInt();
-				int result = 0;
-				string file_name = root["info"]["file_name"].asString();
-
-				if (file_name.size() > 0)
-				{
-					m_attr["folder_name"] = file_name;
-				}
-				else
-				{
-					m_attr["folder_name"] = get_current_time_and_date();
-				}
-
-				for (auto &value : m_attr["channels"])
-				{
-					//cout << "file_name : " << root["info"]["file_name"].asString() << endl;
-					//cout << "m_attr[folder_name] : " << m_attr["folder_name"].asString() << endl;
-
-					if (bit_state > 0)
-					{
-						m_attr["bit_state"] = bit_state;
-						//result = bit_state & (1 << m_nChannel);
-					}
-					m_CRecv[m_nChannel] = new CRecv();
-					if (m_CRecv[m_nChannel]->Create(m_attr["channels"][m_nChannel], m_attr, m_nChannel))
-					{
-						cout << "[COMM] Recv(" << m_nChannel << ") thread is created" << endl;
-					}
-					else
-					{
-						cout << "[COMM] Recv(" << m_nChannel << ") thread is failed" << endl;
-					}
-					m_nChannel++;
-				}
-
-				sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString();
-				system(sstm.str().c_str());
-				sstm.str("");
-
-				root["time"] = get_current_time_and_date();
-
-				sstm << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString() << "/"
-					 << "info.json";
-				CreateMetaJson(root, sstm.str());
-				sstm.str("");
-			}
-			else
-			{
-				cout << "[COMM] Service is running" << endl;
-			}
+			MuxStart();
 		}
-		else if (root["cmd"] == "save_stop")
+		else if (m_root["cmd"] == "save_stop")
 		{
-			if (m_bIsRunning)
-			{
-				Delete();
-				_d("[COMM] muxing completed\n");
-				m_nChannel = 0;
-				m_bIsRunning = false;
-			}
-			else
-			{
-				cout << "[COMM] Service is not running" << endl;
-			}
+			MuxStop();
 		}
 	}
 	else
@@ -229,6 +144,93 @@ bool CCommMgr::TX(char *buff, int size)
 
 	sendto(m_sdSend, buff, size, 0, (struct sockaddr *)&sin, sin_size);
 	cout << "[COMM] ip : " << inet_ntoa(sin.sin_addr) << " port : " << m_nPort << ", send message(" << size << ") : " << buff << endl;
+}
+
+bool CCommMgr::MuxStart()
+{
+	stringstream sstm;
+	if (m_bIsRunning == false)
+	{
+		m_bIsRunning = true;
+		m_nChannel = 0;
+
+		int bit_state = m_root["info"]["bit_state"].asInt();
+		int result = 0;
+		string file_name = m_root["info"]["file_name"].asString();
+
+		if (file_name.size() > 0)
+		{
+			m_attr["folder_name"] = file_name;
+		}
+		else
+		{
+			m_attr["folder_name"] = get_current_time_and_date();
+		}
+
+		for (auto &value : m_attr["channels"])
+		{
+			//cout << "file_name : " << root["info"]["file_name"].asString() << endl;
+			//cout << "m_attr[folder_name] : " << m_attr["folder_name"].asString() << endl;
+
+			if (bit_state > 0)
+			{
+				m_attr["bit_state"] = bit_state;
+				//result = bit_state & (1 << m_nChannel);
+			}
+			m_CRecv[m_nChannel] = new CRecv();
+			if (m_CRecv[m_nChannel]->Create(m_attr["channels"][m_nChannel], m_attr, m_nChannel))
+			{
+				cout << "[COMM] Recv(" << m_nChannel << ") thread is created" << endl;
+			}
+			else
+			{
+				cout << "[COMM] Recv(" << m_nChannel << ") thread is failed" << endl;
+			}
+			m_nChannel++;
+		}
+
+		sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString();
+		system(sstm.str().c_str());
+		sstm.str("");
+
+		m_root["time"] = get_current_time_and_date();
+
+		sstm << m_attr["file_dst"].asString() << "/" << m_attr["folder_name"].asString() << "/"
+			 << "info.json";
+		CreateMetaJson(m_root, sstm.str());
+		sstm.str("");
+	}
+	else
+	{
+		cout << "[COMM] Service is running" << endl;
+	}
+}
+
+bool CCommMgr::MuxStop()
+{
+	if (m_bIsRunning == true)
+	{
+		Delete();
+		_d("[COMM] muxing completed\n");
+		m_nChannel = 0;
+		m_bIsRunning = false;
+	}
+	else
+	{
+		cout << "[COMM] Service is not running" << endl;
+	}
+}
+
+bool CCommMgr::Restart()
+{
+	if (m_bIsRunning)
+	{
+		MuxStop();
+		usleep(10000);
+		MuxStart();
+	}
+
+	return true;
 }
 
 void CCommMgr::Run()
