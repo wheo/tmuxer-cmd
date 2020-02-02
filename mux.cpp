@@ -393,6 +393,27 @@ bool CMux::Muxing()
 		}
 	}
 
+	if (m_type == "video")
+	{
+		if (m_nFrameCount > 0)
+		{
+			mux_files["name"] = m_filename;
+			mux_files["frame"] = m_nFrameCount;
+			meta["files"].append(mux_files);
+			CreateMetaJson(meta, group_name);
+		}
+	}
+	else if (m_type == "audio")
+	{
+		if (m_nAudioCount > 0)
+		{
+			mux_files["name"] = m_audio_name;
+			mux_files["frame"] = m_nAudioCount;
+			meta["files"].append(mux_files);
+			CreateMetaJson(meta, group_name);
+		}
+	}
+
 	if (es)
 	{
 		fclose(es);
