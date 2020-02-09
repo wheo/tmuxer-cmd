@@ -98,7 +98,7 @@ void CCore::Run()
 		cout << "[CORE] Thread is alive" << endl;
 #endif
 		sleep(1);
-		cout << "[CORE] " << m_root["make_folder_interval"].asUInt() << ", counter : " << m_counter << endl;
+		//cout << "[CORE] " << m_root["make_folder_interval"].asUInt() << ", counter : " << m_counter << endl;
 		if (m_type == 0) // 상시녹화
 		{
 			if (m_comm->isRunning() == true)

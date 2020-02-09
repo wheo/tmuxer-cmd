@@ -37,16 +37,6 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_pts = 0;
 	//_d("[RECV.ch%d] alloc : %x\n", m_nChannel, m_frame_buf);
 
-	if (!SetSocket())
-	{
-		cout << "[RECV.ch" << m_nChannel << "] SetSocket() is failed" << endl;
-		return false;
-	}
-	else
-	{
-		cout << "[RECV.ch" << m_nChannel << "] SetSocket() is succeed" << endl;
-	}
-
 	int bit_state = m_attr["bit_state"].asInt();
 	int result = bit_state & (1 << m_nChannel);
 
@@ -84,6 +74,16 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 			CreateMetaJson(meta, group_name);
 			return false;
 		}
+	}
+
+	if (!SetSocket())
+	{
+		cout << "[RECV.ch" << m_nChannel << "] SetSocket() is failed" << endl;
+		return false;
+	}
+	else
+	{
+		cout << "[RECV.ch" << m_nChannel << "] SetSocket() is succeed" << endl;
 	}
 
 	m_queue = new CQueue();
@@ -257,7 +257,7 @@ bool CRecv::Receive()
 #endif
 			if ((nPrevPacketNum + 1) != nCurPacketNum)
 			{
-#if __DEBUG
+#if 1
 				_d("\n[RECV.ch%d] TotalPacketNum(%d)PrevPacketNum(%d)/nCurPacketNum(%d)\n\n", m_nChannel, nTotalPacketNum, nPrevPacketNum, nCurPacketNum);
 #endif
 			}
@@ -275,7 +275,7 @@ bool CRecv::Receive()
 			if (nTotalPacketNum == nCurPacketNum)
 			{
 				// 1 frame 만들어 졌을 때
-#if __DEBUG
+#if 0
 				_d("[RECV.ch%d] recv_nTotalStreamSize(%d)/recv_nestedStreamSize(%d)\n", m_nChannel, recv_nTotalStreamSize, recv_nestedStreamSize);
 				_d("[RECV.ch%d] 1 (%d) frame created\n", m_nChannel, recv_nestedStreamSize);
 #endif
@@ -298,7 +298,7 @@ bool CRecv::Receive()
 
 				end = high_resolution_clock::now();
 				tick_diff = duration_cast<microseconds>(end - begin).count();
-#if __DEBUG
+#if 1
 				_d("[RECV.ch%d][%lld] Putted !!!!! frame buf(%x), size : %d, type : %d, pkt.flags : %d, pts :  %lld\n", m_nChannel, tick_diff, pkt.data, pkt.size, recv_frame_type, pkt.flags, pkt.pts);
 #endif
 				m_queue->Put(&pkt);
@@ -322,8 +322,12 @@ bool CRecv::Receive()
 
 void CRecv::Delete()
 {
-	close(m_sock); // release socket
-	cout << "[RECV.ch" << m_nChannel << "] sock " << m_sock << " is closed" << endl;
+	if (m_sock > 0)
+	{
+		close(m_sock); // release socket
+		cout << "[RECV.ch" << m_nChannel << "] sock " << m_sock << " is closed" << endl;
+	}
+
 	SAFE_DELETE(m_mux);
 	m_mux = NULL;
 }
