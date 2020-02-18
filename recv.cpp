@@ -34,7 +34,7 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_file_idx = 0;
 	m_Is_iframe = false;
 	m_frame_buf = new unsigned char[MAX_frame_size];
-	m_pts = 0;
+	m_pts = -1;
 	//_d("[RECV.ch%d] alloc : %x\n", m_nChannel, m_frame_buf);
 
 	int bit_state = m_attr["bit_state"].asInt();
@@ -176,7 +176,10 @@ bool CRecv::SetSocket()
 
 bool CRecv::Receive()
 {
-	unsigned char buff_rcv[PACKET_HEADER_SIZE + PACKET_SIZE];
+	unsigned char buff_rcv[PACKET_HEADER_EXTEND_SIZE + PACKET_SIZE];
+
+	bool is_first_time_recv = false;
+	int64_t first_time_pts = -1;
 
 	int rd;
 	int fd = 0;
@@ -193,31 +196,17 @@ bool CRecv::Receive()
 	int nTotalPacketNum = 0;
 	int nCurPacketNum = 0;
 	int nPrevPacketNum = 0;
-#if 0
-	stringstream sstm;
-	sstm << "test_" << m_nChannel << ".hevc";
 
-	string dumpname = sstm.str();
-
-	FILE *es = fopen(dumpname.c_str(), "wb");
-#endif
-#if 0
-	mux_cfg_s mux_cfg;
-	memset(&mux_cfg, 0x00, sizeof(mux_cfg_s));
-#endif
-	//memset(m_frame_buf, 0x00, sizeof(m_frame_buf));
+	int64_t recv_pts = -1;
 
 	cout << "[RECV.ch" << m_nChannel << "] type : " << m_info["type"].asString() << endl;
 	m_queue->Enable();
 
-	high_resolution_clock::time_point begin;
-	high_resolution_clock::time_point end;
-	int64_t tick_diff = 0;
+	m_begin = high_resolution_clock::now();
 
-	begin = high_resolution_clock::now();
 	while (!m_bExit)
 	{
-		rd = recvfrom(m_sock, buff_rcv, PACKET_HEADER_SIZE + PACKET_SIZE, 0, NULL, 0);
+		rd = recvfrom(m_sock, buff_rcv, PACKET_HEADER_EXTEND_SIZE + PACKET_SIZE, 0, NULL, 0);
 #if __DEBUG
 		_d("[RECV.ch%d] rd : %d\n", m_nChannel, rd);
 #endif
@@ -249,6 +238,12 @@ bool CRecv::Receive()
 			memcpy(&recv_codec_type, buff_rcv + 17, 1);
 			memcpy(&recv_frame_type, buff_rcv + 18, 1);
 			memcpy(&recv_reserve, buff_rcv + 19, sizeof(recv_reserve));
+
+			if (recv_reserve[0] == 1)
+			{
+				//확장일 경우
+				memcpy(&recv_pts, buff_rcv + 30, sizeof(recv_pts));
+			}
 #if 0
 			for (int i = 0; i < PACKET_HEADER_SIZE; i++)
 			{
@@ -267,13 +262,18 @@ bool CRecv::Receive()
 			cout << "[RECV.ch." << m_nChannel << "] nTotalPacketNum(" << nTotalPacketNum << "/" << nCurPacketNum << ", " << recv_nestedStreamSize << ")" << endl;
 #endif
 			//_d("add : %x, size : %d\n", m_frame_buf, MAX_frame_size);
-			memcpy(m_frame_buf + recv_nestedStreamSize, buff_rcv + PACKET_HEADER_SIZE, recv_nCurStreamSize);
+			memcpy(m_frame_buf + recv_nestedStreamSize, buff_rcv + PACKET_HEADER_EXTEND_SIZE, recv_nCurStreamSize);
 			recv_nestedStreamSize += recv_nCurStreamSize;
 #if __DEBUG
 			_d("[RECV.ch%d] (%d/%d)\n", m_nChannel, recv_nCurStreamSize, recv_nestedStreamSize);
 #endif
 			if (nTotalPacketNum == nCurPacketNum)
 			{
+#if 0
+				m_end = high_resolution_clock::now();
+				tick_diff = duration_cast<microseconds>(m_end - m_begin).count();
+#endif
+				m_nFrameCount++;
 				// 1 frame 만들어 졌을 때
 #if 0
 				_d("[RECV.ch%d] recv_nTotalStreamSize(%d)/recv_nestedStreamSize(%d)\n", m_nChannel, recv_nTotalStreamSize, recv_nestedStreamSize);
@@ -285,26 +285,34 @@ bool CRecv::Receive()
 				AVPacket pkt;
 				av_init_packet(&pkt);
 
-				m_pts++;
+				if (is_first_time_recv == false)
+				{
+					first_time_pts = recv_pts;
+					is_first_time_recv = true;
+				}
 
 				pkt.data = m_frame_buf;
 				pkt.size = recv_nestedStreamSize;
+#if 0
 				pkt.pts = m_pts;
+#endif
+				if (recv_pts > 0)
+				{
+					// 0부터 시작
+					pkt.pts = (recv_pts - first_time_pts) / 1000;
+					m_pts = pkt.pts;
+					tick_diff = pkt.pts;
+				}
 
 				if (recv_frame_type == 1)
 				{
 					pkt.flags = AV_PKT_FLAG_KEY;
 				}
-
-				end = high_resolution_clock::now();
-				tick_diff = duration_cast<microseconds>(end - begin).count();
 #if 1
-				_d("[RECV.ch%d][%lld] Putted !!!!! frame buf(%x), size : %d, type : %d, pkt.flags : %d, pts :  %lld\n", m_nChannel, tick_diff, pkt.data, pkt.size, recv_frame_type, pkt.flags, pkt.pts);
+				_d("[RECV.ch%d][%d] size : %d, type : %d, pkt.flags : %d, pts :  %lld, dur : %lld, recv : %lld\n", m_nChannel, m_nFrameCount, pkt.size, recv_frame_type, pkt.flags, pkt.pts, tick_diff - old_tick_diff, recv_pts);
 #endif
 				m_queue->Put(&pkt);
-
-				begin = end;
-				tick_diff = 0;
+				old_tick_diff = tick_diff;
 
 				recv_nestedStreamSize = 0;
 				nPrevPacketNum = 0;

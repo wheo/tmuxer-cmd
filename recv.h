@@ -43,11 +43,16 @@ private:
 	int m_nRecSec;	 // 얼마나 녹화를 할 것인가
 	int m_nFrameCount; // 프레임 수
 	int m_file_idx;	// 파일 인덱스 번호
+	int64_t m_pts;	 // 패킷 수신받은 시간
 	string m_filename;
 	int m_sock;
 	bool m_Is_iframe;
 	unsigned char *m_frame_buf;
-	uint64_t m_pts;
+	int64_t tick_diff;
+	int64_t old_tick_diff;
+
+	high_resolution_clock::time_point m_begin;
+	high_resolution_clock::time_point m_end;
 
 	Json::Value json;
 

@@ -214,12 +214,16 @@ void CTSMuxer::add_stream(OutputStream *ost, AVFormatContext *oc, AVCodec **code
 			ost->st->time_base.den = m_mux_cfg.vid.fps;
 		}
 #else
-		ost->st->time_base.num = m_mux_cfg.vid.num;
-		ost->st->time_base.den = m_mux_cfg.vid.den;
+		//ost->st->time_base.num = m_mux_cfg.vid.num;
+		//ost->st->time_base.den = m_mux_cfg.vid.den;
+
+		//microsecond timebase
+		ost->st->time_base.num = 1;
+		ost->st->time_base.den = AV_TIME_BASE;
 #endif
 
 		c->time_base = ost->st->time_base;
-		_d("[TSMUXER] %d/%d\n", ost->st->time_base.num, ost->st->time_base.den);
+		_d("[TSMUXER] timebase(%d/%d)\n", ost->st->time_base.num, ost->st->time_base.den);
 
 		c->gop_size = m_mux_cfg.vid.max_gop; /* emit one intra frame every twelve frames at most */
 
@@ -326,6 +330,7 @@ AVFrame *CTSMuxer::alloc_picture(enum AVPixelFormat pix_fmt, int width, int heig
 	return picture;
 }
 
+#if 0
 void CTSMuxer::put_data(unsigned char *pData, int nDataSize)
 {
 	AVPacket pkt;
@@ -341,10 +346,12 @@ void CTSMuxer::put_data(unsigned char *pData, int nDataSize)
 
 	m_nFrameCount++;
 }
+#endif
+
 void CTSMuxer::put_data(AVPacket *pkt)
 {
 	AVCodecContext *c = m_video_st.enc;
-#if 1
+#if 0
 	pkt->pts = m_nFrameCount;
 	pkt->dts = m_nFrameCount;
 #else
@@ -363,8 +370,9 @@ int CTSMuxer::write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base,
 	//	pkt->pts = av_rescale(g_frame_count, 12800, 25);
 	//	pkt->pts = av_compare_ts(g_frame_count, m_video_st.enc->time_base, STREAM_DURATION, )
 	//_d("before pts : %lld, src num : %d, src den : %d, dst num : %d, dst den : %d\n", pkt->pts, time_base->num, time_base->den, st->time_base.num, st->time_base.den);
-
+#if 1
 	av_packet_rescale_ts(pkt, *time_base, st->time_base);
+#endif
 
 	//_d("after pts : %lld, src num : %d, src den : %d, dst num : %d, dst den : %d\n", pkt->pts, time_base->num, time_base->den, st->time_base.num, st->time_base.den);
 	pkt->stream_index = st->index;
@@ -397,13 +405,6 @@ int CTSMuxer::write_frame(AVFormatContext *fmt_ctx, const AVRational *time_base,
 		}
 	}
 #endif
-
-	//on auto bsf
-	//fmt_ctx->flags |= AVFMT_FLAG_AUTO_BSF;
-	//fmt_ctx->flags |= AVFMT_FLAG_IGNDTS;
-	//fmt_ctx->flags |= AVFMT_FLAG_NOFILLIN;
-	//_d("fmt_ctx_flag : %x\n", fmt_ctx->flags); //확인완료 AVFMT_FLAG_AUTO_BSF
-
 	ret = av_interleaved_write_frame(fmt_ctx, pkt);
 	//_d("av_interleaved_write_frame : ret : %d\m", ret);
 	return ret;

@@ -54,6 +54,7 @@ using namespace chrono;
 #include "misc.h"
 
 #define PACKET_HEADER_SIZE 24
+#define PACKET_HEADER_EXTEND_SIZE PACKET_HEADER_SIZE + 22
 #define PACKET_SIZE 4096
 
 #define MAX_VIDEO_CHANNEL_COUNT 6

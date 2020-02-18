@@ -39,6 +39,8 @@ private:
 
 	uint64_t m_nTotalFrameCount; // 전체 프레임
 	uint64_t m_nTotalAudioCount; // 전체 오디오
+	int64_t m_current_pts;		 //현재 패킷의 pts
+	int m_file_cnt;				 //파일의 개수
 
 	int m_file_idx; // 파일 인덱스 번호
 	int m_is_intra;

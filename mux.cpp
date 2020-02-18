@@ -44,6 +44,8 @@ bool CMux::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_nTotalAudioCount = 0;
 	is_old_intra = false;
 
+	m_file_cnt = 1;
+
 	SetSocket();
 
 	if (m_type == "video")
@@ -226,6 +228,7 @@ bool CMux::Muxing()
 	int size;
 	int ret = 0;
 	string strbuf;
+	int64_t file_last_pts = -1;
 
 	while (!m_bExit)
 	{
@@ -235,6 +238,7 @@ bool CMux::Muxing()
 			av_init_packet(&pkt);
 			if (m_queue->Get(&pkt) > 0)
 			{
+				m_current_pts = pkt.pts;
 				//es write
 				if (pkt.flags == AV_PKT_FLAG_KEY)
 				{
@@ -267,15 +271,18 @@ bool CMux::Muxing()
 #if __DEBUG
 				_d("[MUX.ch.%d] current frame : %d\n", m_nChannel, m_nFrameCount);
 #endif
-				int nDstFrame = (m_nRecSec + 1) * mux_cfg.vid.fps;
-				if (m_nFrameCount >= nDstFrame && m_queue->IsNextKeyFrame())
+				//int nDstFrame = (m_nRecSec + 1) * mux_cfg.vid.fps;
+				//if (m_nFrameCount >= nDstFrame && m_queue->IsNextKeyFrame())
+				if (m_current_pts - file_last_pts > (int64_t)(m_nRecSec * AV_TIME_BASE) + 300000) // 300000은 설정된 초를 약간 넘기기위한 보정값
 				{
+					file_last_pts = m_current_pts;
+					m_file_cnt++;
 					int finalFrameCount = 0;
 					finalFrameCount = m_nFrameCount;
 					string final_filename = m_filename;
 					m_nFrameCount = 0;
 
-					cout << "[MUX.ch." << m_nChannel << "] " << m_filename << " mux completed" << endl;
+					cout << "[MUX.ch." << m_nChannel << "] " << m_filename << " mux completed, totalframe(" << finalFrameCount << "), (" << m_current_pts << "), (" << m_nRecSec << "), (" << mux_cfg.vid.fps << ")" << endl;
 					m_file_idx++;
 
 					SAFE_DELETE(m_pMuxer);
