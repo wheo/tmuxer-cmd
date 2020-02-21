@@ -23,6 +23,7 @@
         "cwchar": "cpp",
         "cwctype": "cpp",
         "sstream": "cpp",
-        "new": "cpp"
+        "new": "cpp",
+        "thread": "cpp"
     }    
 }

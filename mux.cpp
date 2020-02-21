@@ -17,15 +17,11 @@ CMux::~CMux(void)
 	m_bExit = true;
 
 	_d("[MUX.ch%d] Trying to exit thread\n", m_nChannel);
-	Delete();
+	//Delete();
 	Terminate();
 	_d("[MUX.ch%d] exited...\n", m_nChannel);
 
 	pthread_mutex_destroy(&m_mutex_mux);
-}
-
-void CMux::log(int type, int state)
-{
 }
 
 bool CMux::Create(Json::Value info, Json::Value attr, int nChannel)
@@ -91,59 +87,73 @@ bool CMux::SetQueue(CQueue **queue, int nChannel)
 
 void CMux::Run()
 {
-	while (!m_bExit)
+	Muxing();
+}
+
+void CMux::SetConfig(mux_cfg_s *mux_cfg, int codec_type, int recv_type)
+{
+	// 1(NTSC), 2(PAL), 3(PANORAMA), 4(FOCUS)
+	cout << "[SetConfig] codec_type (" << codec_type << ") recv_type(" << recv_type << ")" << endl;
+	if (recv_type == 1)
 	{
-		if (!Muxing())
-		{
-			//error
-			break;
-		}
-		else
-		{
-			//success
-		}
+		//NTSC
+		mux_cfg->output = 1;
+		mux_cfg->vid.codec = codec_type;
+		mux_cfg->vid.num = 1001;
+		mux_cfg->vid.den = 60000;
+		mux_cfg->vid.fps = 59.94;
+		mux_cfg->vid.max_gop = 30;
+		mux_cfg->vid.min_gop = 30;
+		mux_cfg->vid.width = 720;
+		mux_cfg->vid.height = 288;
 	}
-	//cout << "[MUX.ch" << m_nChannel << "] loop out" << endl;
+	else if (recv_type == 2)
+	{
+		//PAL
+		mux_cfg->output = 1;
+		mux_cfg->vid.codec = codec_type;
+		mux_cfg->vid.num = 1000;
+		mux_cfg->vid.den = 50000;
+		mux_cfg->vid.fps = 50;
+		mux_cfg->vid.max_gop = 30;
+		mux_cfg->vid.min_gop = 30;
+		mux_cfg->vid.width = 720;
+		mux_cfg->vid.height = 240;
+	}
+	else if (recv_type == 3)
+	{
+		//PANORAMA
+		mux_cfg->output = 1;
+		mux_cfg->vid.codec = codec_type;
+		mux_cfg->vid.fps = 4;
+		mux_cfg->vid.num = 1;
+		mux_cfg->vid.den = 4;
+		mux_cfg->vid.max_gop = 30;
+		mux_cfg->vid.min_gop = 30;
+		mux_cfg->vid.width = 1024;
+		mux_cfg->vid.height = 1024;
+	}
+	else if (recv_type == 4)
+	{
+		mux_cfg->output = 1;
+		mux_cfg->vid.codec = codec_type;
+		mux_cfg->vid.fps = 4;
+		mux_cfg->vid.num = 1;
+		mux_cfg->vid.den = 4;
+		mux_cfg->vid.max_gop = 1;
+		mux_cfg->vid.min_gop = 1;
+		mux_cfg->vid.width = 1024;
+		mux_cfg->vid.height = 1280;
+	}
 }
 
 bool CMux::Muxing()
 {
-	mux_cfg_s mux_cfg;
-	memset(&mux_cfg, 0x00, sizeof(mux_cfg_s));
-
-// recv로 이동
-#if 0
-	int bit_state = m_attr["bit_state"].asInt();
-	int result = bit_state & (1 << m_nChannel);
-
-	cout << "[MUX.ch." << m_nChannel << "] bit_state : " << bit_state << ", result : " << result << endl;
-
-	string sub_dir_name;
-	string group_name;
-	sub_dir_name = m_attr["folder_name"].asString();
-
-	stringstream sstm;
-	sstm << "mkdir -p " << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel;
-	system(sstm.str().c_str());
-	// clear method is not working then .str("") correct
-	sstm.str("");
-
-	if (bit_state > 0)
-	{
-		cout << "channel : " << m_nChannel << ", bit state is " << bit_state << ", result : " << result << endl;
-		if (result < 1)
-		{
-			cout << "channel " << m_nChannel << " is not use anymore" << endl;
-			return false;
-		}
-	}
-#else
 	stringstream sstm;
 	string sub_dir_name = m_attr["folder_name"].asString();
 	string group_name;
 	string file_dst = m_attr["file_dst"].asString();
 	string ip_string = m_info["ip"].asString();
-#endif
 
 	sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/"
 		 << "meta.json";
@@ -156,7 +166,7 @@ bool CMux::Muxing()
 	sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".mp4";
 #endif
 	m_filename = sstm.str();
-	cout << "[MUX.ch." << m_nChannel << "] expected output file name : " << m_filename << endl;
+	cout << "[MUX.ch" << m_nChannel << "] expected output file name : " << m_filename << endl;
 	sstm.str("");
 
 #if __IP_FILE_NAME
@@ -174,39 +184,30 @@ bool CMux::Muxing()
 #endif
 	m_audio_name = sstm.str();
 
+	mux_cfg_s mux_cfg;
+	memset(&mux_cfg, 0x00, sizeof(mux_cfg_s));
+
+#if 0
 	mux_cfg.output = 1;
 	mux_cfg.vid.codec = m_attr["codec"].asInt(); // 0 : H264, 1 : HEVC
-	int num = m_info["num"].asInt();
-	int den = m_info["den"].asInt();
-	mux_cfg.vid.num = num;
-	mux_cfg.vid.den = den;
-	mux_cfg.vid.fps = (double)den / (double)num;
-	mux_cfg.vid.width = m_info["width"].asInt();
-	mux_cfg.vid.height = m_info["height"].asInt();
-	mux_cfg.vid.max_gop = 30;
 
-	_d("[MUX.ch%d] fps : %.3f\n", m_nChannel, mux_cfg.vid.fps);
+	mux_cfg.vid.num = 1001;
+	mux_cfg.vid.den = 60000;
+	mux_cfg.vid.fps = 59.94;
+	mux_cfg.vid.width = 720;
+	mux_cfg.vid.height = 288;
+	mux_cfg.vid.max_gop = 30;
+#endif
 
 	Json::Value meta;
 	Json::Value mux_files;
-
+#if 0
 	meta["filename"] = m_filename;
 	meta["channel"] = m_nChannel;
 	meta["codec"] = mux_cfg.vid.codec;
-	meta["fps"] = mux_cfg.vid.fps;
-	meta["width"] = mux_cfg.vid.width;
-	meta["height"] = mux_cfg.vid.height;
 	meta["type"] = m_type;
-	meta["num"] = m_info["num"].asInt();
-	meta["den"] = m_info["den"].asInt();
-
 	CreateMetaJson(meta, group_name);
-
-	if (m_type == "video")
-	{
-		m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg);
-	}
-
+#endif
 	string channel;
 
 	FILE *es = NULL;
@@ -215,12 +216,6 @@ bool CMux::Muxing()
 #if __DEBUG
 	es = fopen(m_es_name.c_str(), "wb");
 #endif
-
-	if (m_type == "audio")
-	{
-		pAudio = fopen(m_audio_name.c_str(), "wb");
-	}
-
 	m_nRecSec = m_attr["rec_sec"].asInt();
 
 	Json::Value root;
@@ -228,16 +223,35 @@ bool CMux::Muxing()
 	int size;
 	int ret = 0;
 	string strbuf;
+	int64_t file_first_pts = -1;
 	int64_t file_last_pts = -1;
+	bool is_first_pkt = false;
+	int recv_type = 1;
+	int codec_type = 0;
 
 	while (!m_bExit)
 	{
-		if (m_type == "video" && !m_bExit)
+		if (m_type == "video")
 		{
+			if (m_bExit == true)
+			{
+				_d("[MUX.ch.%d] buffercnt : %d\n", m_nChannel, m_queue->GetVideoBufferCount());
+				if (m_queue->GetVideoBufferCount() < 1)
+				{
+					break;
+				}
+			}
 			AVPacket pkt;
 			av_init_packet(&pkt);
-			if (m_queue->Get(&pkt) > 0)
+			if (m_queue->Get(&pkt, &codec_type, &recv_type) > 0)
 			{
+				SetConfig(&mux_cfg, codec_type, recv_type);
+				if (is_first_pkt == false)
+				{
+					m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg);
+					file_first_pts = pkt.pts;
+					is_first_pkt = true;
+				}
 				m_current_pts = pkt.pts;
 				//es write
 				if (pkt.flags == AV_PKT_FLAG_KEY)
@@ -250,10 +264,10 @@ bool CMux::Muxing()
 				if (true)
 #endif
 				{
+					m_pMuxer->put_data(&pkt);
 #if __DEBUG
 					fwrite(pPkt->data, 1, pPkt->size, es);
 #endif
-					m_pMuxer->put_data(&pkt);
 				}
 				m_queue->Ret(&pkt);
 			}
@@ -268,8 +282,8 @@ bool CMux::Muxing()
 			{
 				m_nFrameCount++;
 				m_nTotalFrameCount++;
-#if __DEBUG
-				_d("[MUX.ch.%d] current frame : %d\n", m_nChannel, m_nFrameCount);
+#if 1
+				//_d("[MUX.ch.%d] current frame : %d (%lld), buffercnt : %d\n", m_nChannel, m_nFrameCount, m_current_pts, m_queue->GetVideoBufferCount());
 #endif
 				//int nDstFrame = (m_nRecSec + 1) * mux_cfg.vid.fps;
 				//if (m_nFrameCount >= nDstFrame && m_queue->IsNextKeyFrame())
@@ -300,6 +314,7 @@ bool CMux::Muxing()
 					strbuf = Json::writeString(builder, root);
 					TX((char *)strbuf.c_str(), strbuf.size());
 
+					is_first_pkt = false;
 					m_pMuxer = new CTSMuxer();
 					sstm.str("");
 #if __IP_FILE_NAME
@@ -309,7 +324,6 @@ bool CMux::Muxing()
 #endif
 					m_filename = sstm.str();
 					m_pMuxer->CreateOutput(m_filename.c_str(), &mux_cfg, m_nTotalFrameCount);
-
 #if __DEBUG
 					fclose(es);
 #endif
@@ -317,6 +331,8 @@ bool CMux::Muxing()
 
 					mux_files["name"] = final_filename;
 					mux_files["frame"] = finalFrameCount;
+					mux_files["first_pts"] = file_first_pts;
+					mux_files["last_pts"] = file_last_pts;
 					meta["files"].append(mux_files);
 					CreateMetaJson(meta, group_name);
 
@@ -338,6 +354,14 @@ bool CMux::Muxing()
 			ELEM *pe = (ELEM *)m_queue->GetAudio();
 			if (pe && pe->len > 0)
 			{
+				if (is_first_pkt == false)
+				{
+					pAudio = fopen(m_audio_name.c_str(), "wb");
+					file_first_pts = m_audio_pts;
+					is_first_pkt = true;
+				}
+				memcpy(&m_audio_pts, pe->p, 8);
+				//cout << "[MUX.ch" << m_nChannel << "] audio pts : " << m_audio_pts << endl;
 				fwrite(pe->p, 1, pe->len, pAudio);
 				m_queue->RetAudio(pe);
 			}
@@ -359,6 +383,7 @@ bool CMux::Muxing()
 					int finalAudioCount = 0;
 					finalAudioCount = m_nAudioCount;
 					string final_filename = m_audio_name;
+					file_last_pts = m_audio_pts;
 
 					m_nAudioCount = 0;
 
@@ -369,6 +394,8 @@ bool CMux::Muxing()
 
 					mux_files["name"] = final_filename;
 					mux_files["frame"] = finalAudioCount;
+					mux_files["first_pts"] = file_first_pts;
+					mux_files["last_pts"] = file_last_pts;
 					meta["files"].append(mux_files);
 					CreateMetaJson(meta, group_name);
 
@@ -393,6 +420,7 @@ bool CMux::Muxing()
 #else
 					sstm << m_attr["file_dst"].asString() << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".audio";
 #endif
+					is_first_pkt = false;
 					m_audio_name = sstm.str();
 					pAudio = fopen(m_audio_name.c_str(), "wb");
 				}
@@ -406,8 +434,11 @@ bool CMux::Muxing()
 		{
 			mux_files["name"] = m_filename;
 			mux_files["frame"] = m_nFrameCount;
+			mux_files["first_pts"] = file_first_pts;
+			mux_files["last_pts"] = m_current_pts;
 			meta["files"].append(mux_files);
 			CreateMetaJson(meta, group_name);
+			SAFE_DELETE(m_pMuxer);
 		}
 	}
 	else if (m_type == "audio")
@@ -416,6 +447,8 @@ bool CMux::Muxing()
 		{
 			mux_files["name"] = m_audio_name;
 			mux_files["frame"] = m_nAudioCount;
+			mux_files["first_pts"] = file_first_pts;
+			mux_files["last_pts"] = m_audio_pts;
 			meta["files"].append(mux_files);
 			CreateMetaJson(meta, group_name);
 		}
@@ -457,10 +490,7 @@ bool CMux::TX(char *buff, int size)
 
 void CMux::Delete()
 {
-
 	SAFE_DELETE(m_pMuxer);
-
-	//만약 m_queue를 삭제 안하면?
-	m_queue->Clear();
+	//m_queue->Clear();
 	//SAFE_DELETE(m_queue);
 }

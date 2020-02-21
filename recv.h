@@ -21,8 +21,7 @@ public:
 	void Delete();
 
 	bool Receive();
-
-	void log(int type, int state);
+	string GetChannelType(int nChannel);
 
 protected:
 	int m_nChannel;		// 현재 채널 넘버

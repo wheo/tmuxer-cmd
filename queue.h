@@ -1,10 +1,10 @@
 #ifndef _QUEUE_H_
 #define _QUEUE_H_
 
-#define MAX_NUM_QUEUE 120
-#define MAX_NUM_AUDIO_QUEUE 128
+#define MAX_NUM_QUEUE 60
+#define MAX_NUM_AUDIO_QUEUE 64
 #define QUE_INFINITE -1
-#define MIN_BUF_FRAME 30
+#define MIN_BUF_FRAME 10
 
 class CQueue
 {
@@ -15,15 +15,17 @@ public:
 	void SetInfo(int nChannel, string type);
 	void Clear();
 
-	bool Put(AVPacket *pkt);
+	bool Put(AVPacket *pkt, int codec_type, int recv_type);
 	int PutAudio(char *pData, int nSize);
 
 	bool IsNextKeyFrame();
-	int Get(AVPacket *pkt);
+	int Get(AVPacket *pkt, int *codec_type, int *recv_type);
 	void *GetAudio();
 
 	void Ret(AVPacket *pkt);
 	void RetAudio(void *p);
+
+	int GetVideoBufferCount() { return m_nPacket; }
 
 	void Enable();
 	void EnableAudio();
@@ -50,6 +52,9 @@ private:
 
 	int m_nChannel;
 	string m_type;
+
+	int m_recv_type;
+	int m_codec_type;
 
 	pthread_mutex_t m_mutex;
 

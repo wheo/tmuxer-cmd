@@ -35,6 +35,7 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_Is_iframe = false;
 	m_frame_buf = new unsigned char[MAX_frame_size];
 	m_pts = -1;
+
 	//_d("[RECV.ch%d] alloc : %x\n", m_nChannel, m_frame_buf);
 
 	int bit_state = m_attr["bit_state"].asInt();
@@ -45,7 +46,6 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	string file_dst = m_attr["file_dst"].asString();
 	string sub_dir_name = m_attr["folder_name"].asString();
 	string group_name;
-	string type = m_info["type"].asString();
 
 	stringstream sstm;
 	sstm << "mkdir -p " << file_dst << "/" << sub_dir_name << "/" << m_nChannel;
@@ -68,9 +68,6 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 			cout << "channel " << m_nChannel << " is not use anymore" << endl;
 			meta["filename"] = "";
 			meta["channel"] = m_nChannel;
-			meta["type"] = m_type;
-			meta["num"] = m_info["num"].asInt();
-			meta["den"] = m_info["den"].asInt();
 			CreateMetaJson(meta, group_name);
 			return false;
 		}
@@ -86,8 +83,11 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 		cout << "[RECV.ch" << m_nChannel << "] SetSocket() is succeed" << endl;
 	}
 
+	m_type = GetChannelType(m_nChannel);
+
+	info["type"] = m_type;
 	m_queue = new CQueue();
-	m_queue->SetInfo(m_nChannel, type);
+	m_queue->SetInfo(m_nChannel, m_type);
 
 	Start();
 	//m_queue->Enable();
@@ -100,18 +100,7 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 
 void CRecv::Run()
 {
-	while (!m_bExit)
-	{
-		if (!Receive())
-		{
-			//error
-		}
-		else
-		{
-			// success
-		}
-	}
-	//_d("[RECV.ch%d] thread exit\n", m_nChannel);
+	Receive();
 }
 
 bool CRecv::SetSocket()
@@ -174,6 +163,20 @@ bool CRecv::SetSocket()
 	return true;
 }
 
+string CRecv::GetChannelType(int nChannel)
+{
+	string ret_type = "";
+	if (nChannel < 6)
+	{
+		ret_type = "video";
+	}
+	else if (nChannel >= 6)
+	{
+		ret_type = "audio";
+	}
+	return ret_type;
+}
+
 bool CRecv::Receive()
 {
 	unsigned char buff_rcv[PACKET_HEADER_EXTEND_SIZE + PACKET_SIZE];
@@ -199,7 +202,7 @@ bool CRecv::Receive()
 
 	int64_t recv_pts = -1;
 
-	cout << "[RECV.ch" << m_nChannel << "] type : " << m_info["type"].asString() << endl;
+	cout << "[RECV.ch" << m_nChannel << "] type : " << m_type << endl;
 	m_queue->Enable();
 
 	m_begin = high_resolution_clock::now();
@@ -215,20 +218,28 @@ bool CRecv::Receive()
 			usleep(10);
 			continue;
 		}
-#if 0
-		// 최초 recv 받고 나서 enable
-		if (m_info["type"].asString() == "audio" || m_info["type"].asString() == "video")
-		{
-			m_queue->Enable();
-		}
-#endif
-		if (m_info["type"].asString() == "audio")
+
+		if (m_type == "audio")
 		{
 			void *p;
+			int64_t audio_pts = -1;
 			p = buff_rcv;
+			memcpy(&recv_pts, p, sizeof(recv_pts));
+			if (is_first_time_recv == false)
+			{
+				first_time_pts = recv_pts;
+				is_first_time_recv = true;
+			}
+			if (recv_pts > 0)
+			{
+				// 0부터 시작
+				audio_pts = (recv_pts - first_time_pts) / 1000;
+				memcpy(p, &audio_pts, 8);
+				//_d("[RECV.ch%d] (%d) audio pts(%lld/%lld)\n", m_nChannel, rd, recv_pts, audio_pts);
+			}
 			m_queue->PutAudio((char *)p, rd);
 		}
-		else if (m_info["type"].asString() == "video")
+		else if (m_type == "video")
 		{
 			memcpy(&recv_nTotalStreamSize, buff_rcv, sizeof(recv_nTotalStreamSize));
 			memcpy(&recv_nCurStreamSize, buff_rcv + 4, sizeof(recv_nCurStreamSize));
@@ -252,7 +263,7 @@ bool CRecv::Receive()
 #endif
 			if ((nPrevPacketNum + 1) != nCurPacketNum)
 			{
-#if 1
+#if 0
 				_d("\n[RECV.ch%d] TotalPacketNum(%d)PrevPacketNum(%d)/nCurPacketNum(%d)\n\n", m_nChannel, nTotalPacketNum, nPrevPacketNum, nCurPacketNum);
 #endif
 			}
@@ -308,10 +319,10 @@ bool CRecv::Receive()
 				{
 					pkt.flags = AV_PKT_FLAG_KEY;
 				}
-#if 1
-				_d("[RECV.ch%d][%d] size : %d, type : %d, pkt.flags : %d, pts :  %lld, dur : %lld, recv : %lld\n", m_nChannel, m_nFrameCount, pkt.size, recv_frame_type, pkt.flags, pkt.pts, tick_diff - old_tick_diff, recv_pts);
+#if 0
+				_d("[RECV.ch%d][%d] size : %d, type : %d, pkt.flags : %d, pts :  %lld, dur : %lld\n", m_nChannel, m_nFrameCount, pkt.size, recv_frame_type, pkt.flags, pkt.pts, tick_diff - old_tick_diff);
 #endif
-				m_queue->Put(&pkt);
+				m_queue->Put(&pkt, (int)recv_codec_type, (int)recv_type);
 				old_tick_diff = tick_diff;
 
 				recv_nestedStreamSize = 0;

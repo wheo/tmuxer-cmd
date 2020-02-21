@@ -49,7 +49,6 @@ bool CCore::Create(int type)
 		else
 		{
 			ifs.close();
-			_d("version : %s\n", m_root["version"].asString().c_str());
 			cout << "file_dst : " << m_root["file_dst"].asString() << endl;
 
 			// file_dst 디렉토리 생성
@@ -60,27 +59,6 @@ bool CCore::Create(int type)
 			Json::Value attr;
 
 			attr = m_root;
-#if 0
-			attr["channels"] = m_root["channels"];
-			attr["file_dst"] = m_root["file_dst"];
-			attr["make_folder_interval"] = m_root["make_folder_interval"];
-			attr["rec_sec"] = m_root["rec_sec"];
-			attr["codec"] = m_root["codec"];
-			attr["udp_port"] = m_root["udp_port"];
-
-			for (auto &value : m_root["channels"])
-			{
-				/*
-				cout << value["ip"].asString() << endl;
-				cout << value["port"].asInt() << endl;
-				cout << value["rec_sec"].asInt() << endl;
-				*/
-
-				m_CRecv[m_nChannel] = new CRecv();
-				m_CRecv[m_nChannel]->Create(m_root["channels"][m_nChannel], attr, m_nChannel);
-				m_nChannel++;
-			}
-#endif
 			m_comm = new CCommMgr();
 			m_comm->Open(m_root["udp_muxer_port"][m_type].asInt(), attr);
 		}

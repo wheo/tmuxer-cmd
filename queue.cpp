@@ -33,6 +33,8 @@ CQueue::CQueue()
 	m_nReadAudioPos = 0;
 	m_nWriteAudioPos = 0;
 
+	m_recv_type = 0;
+
 	pthread_mutex_init(&m_mutex, NULL);
 }
 
@@ -80,8 +82,10 @@ void CQueue::Enable()
 	cout << "[QUEUE.ch" << m_nChannel << "] Enable packet outputing now... " << m_nPacket << endl;
 }
 
-bool CQueue::Put(AVPacket *pkt)
+bool CQueue::Put(AVPacket *pkt, int codec_type, int recv_type)
 {
+	m_recv_type = recv_type;
+	m_codec_type = codec_type;
 	int nCount = 0; // timeout 위한 용도
 
 	while (true)
@@ -171,23 +175,25 @@ bool CQueue::IsNextKeyFrame()
 	}
 }
 
-int CQueue::Get(AVPacket *pkt)
+int CQueue::Get(AVPacket *pkt, int *codec_type, int *recv_type)
 {
 	if (m_bEnable == false)
 	{
 		return NULL;
 	}
 
+#if 0
 	if (m_nPacket < MIN_BUF_FRAME)
 	{
 		return NULL;
 	}
+#endif
 
 	pthread_mutex_lock(&m_mutex);
 
 	if (m_pkt[m_nReadPos]->size > 0)
 	{
-#if __DEBUG
+#if 1
 		cout << "[QUEUE.ch" << m_nChannel << "] m_nReadPos : " << m_nReadPos << ", size : " << m_pkt[m_nReadPos]->size << endl;
 #endif
 		//av_init_packet(pkt);
@@ -204,6 +210,8 @@ int CQueue::Get(AVPacket *pkt)
 		   m_pkt[m_nReadPos]->pts, m_pkt[m_nReadPos]->stream_index, m_nPacket);
 #endif
 		av_packet_unref(m_pkt[m_nReadPos]);
+		*codec_type = m_codec_type;
+		*recv_type = m_recv_type;
 		//av_packet_free(m_pkt[m_nReadPos]);
 		pthread_mutex_unlock(&m_mutex);
 		return pkt->size;
