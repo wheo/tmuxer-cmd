@@ -26,7 +26,6 @@ CCore::~CCore(void)
 
 bool CCore::Create(int type)
 {
-	m_counter = 0;
 	m_nChannel = 0;
 	m_type = type;
 	ifstream ifs("./setting.json", ifstream::binary);
@@ -60,7 +59,7 @@ bool CCore::Create(int type)
 
 			attr = m_root;
 			m_comm = new CCommMgr();
-			m_comm->Open(m_root["udp_muxer_port"][m_type].asInt(), attr);
+			m_comm->Open(m_type, m_root["udp_muxer_port"][m_type].asInt(), attr);
 		}
 	}
 
@@ -70,31 +69,42 @@ bool CCore::Create(int type)
 
 void CCore::Run()
 {
+	high_resolution_clock::time_point begin = high_resolution_clock::now();
+	high_resolution_clock::time_point end;
+	int64_t tick_diff = 0;
+	bool is_first_check = false;
 	while (!m_bExit)
 	{
 #if __DEFRECATED
 		cout << "[CORE] Thread is alive" << endl;
 #endif
-		sleep(1);
-		//cout << "[CORE] " << m_root["make_folder_interval"].asUInt() << ", counter : " << m_counter << endl;
+		usleep(10000);
 		if (m_type == 0) // 상시녹화
 		{
 			if (m_comm->isRunning() == true)
 			{
-				m_counter++;
-			}
-
-			if (m_root["make_folder_interval"].asUInt() < m_root["rec_sec"].asUInt())
-			{
-				//not work
-			}
-			else
-			{
-				if (m_counter > m_root["make_folder_interval"].asUInt())
+				if (is_first_check == false)
 				{
-					_d("[CORE] force Restart\n", m_counter);
-					m_comm->Restart();
-					m_counter = 0;
+					begin = high_resolution_clock::now();
+					is_first_check = true;
+				}
+				end = high_resolution_clock::now();
+				tick_diff = duration_cast<microseconds>(end - begin).count();
+				//cout << "[CORE] (" << tick_diff << "), (" << m_comm->isRunning() << ")" << endl;
+
+				if (m_root["make_folder_interval"].asUInt() < m_root["rec_sec"].asUInt())
+				{
+					//not work
+				}
+				else
+				{
+					if (tick_diff > m_root["make_folder_interval"].asUInt() * AV_TIME_BASE)
+					{
+						_d("[CORE] force Restart (%lld)\n", tick_diff);
+						m_comm->Restart();
+						is_first_check = false;
+						begin = end;
+					}
 				}
 			}
 		}

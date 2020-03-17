@@ -2,7 +2,11 @@
 	"configurations": [
 		{
 			"name": "Linux",
-			"includePath": ["${workspaceFolder}/**", "..//ffmpeg/**", "./json/**"],
+			"includePath": [
+				"${workspaceFolder}/**",
+				"..//ffmpeg/**",
+				"./json/**"
+			],
 			"defines": [],
 			"compilerPath": "/usr/bin/g++",
 			"cStandard": "c11",

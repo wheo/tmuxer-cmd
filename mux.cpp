@@ -24,8 +24,9 @@ CMux::~CMux(void)
 	pthread_mutex_destroy(&m_mutex_mux);
 }
 
-bool CMux::Create(Json::Value info, Json::Value attr, int nChannel)
+bool CMux::Create(int nProgramType, Json::Value info, Json::Value attr, int nChannel)
 {
+	m_nProgramType = nProgramType;
 	m_info = info;
 	m_nChannel = nChannel;
 	m_attr = attr;
@@ -93,7 +94,7 @@ void CMux::Run()
 void CMux::SetConfig(mux_cfg_s *mux_cfg, int codec_type, int recv_type)
 {
 	// 1(NTSC), 2(PAL), 3(PANORAMA), 4(FOCUS)
-	cout << "[SetConfig] codec_type (" << codec_type << ") recv_type(" << recv_type << ")" << endl;
+	//cout << "[SetConfig] codec_type (" << codec_type << ") recv_type(" << recv_type << ")" << endl;
 	if (recv_type == 1)
 	{
 		//NTSC
@@ -120,7 +121,7 @@ void CMux::SetConfig(mux_cfg_s *mux_cfg, int codec_type, int recv_type)
 		mux_cfg->vid.width = 720;
 		mux_cfg->vid.height = 240;
 	}
-	else if (recv_type == 3)
+	else if (recv_type == 3 && m_nChannel == 4)
 	{
 		//PANORAMA
 		mux_cfg->output = 1;
@@ -133,7 +134,7 @@ void CMux::SetConfig(mux_cfg_s *mux_cfg, int codec_type, int recv_type)
 		mux_cfg->vid.width = 1024;
 		mux_cfg->vid.height = 1024;
 	}
-	else if (recv_type == 4)
+	else if (recv_type == 3 && m_nChannel == 5)
 	{
 		mux_cfg->output = 1;
 		mux_cfg->vid.codec = codec_type;
@@ -166,7 +167,7 @@ bool CMux::Muxing()
 	sstm << file_dst << "/" << sub_dir_name << "/" << m_nChannel << "/" << m_file_idx << ".mp4";
 #endif
 	m_filename = sstm.str();
-	cout << "[MUX.ch" << m_nChannel << "] expected output file name : " << m_filename << endl;
+	//cout << "[MUX.ch" << m_nChannel << "] expected output file name : " << m_filename << endl;
 	sstm.str("");
 
 #if __IP_FILE_NAME
@@ -187,6 +188,9 @@ bool CMux::Muxing()
 	mux_cfg_s mux_cfg;
 	memset(&mux_cfg, 0x00, sizeof(mux_cfg_s));
 
+	Json::Value meta;
+	Json::Value mux_files;
+
 #if 0
 	mux_cfg.output = 1;
 	mux_cfg.vid.codec = m_attr["codec"].asInt(); // 0 : H264, 1 : HEVC
@@ -197,19 +201,15 @@ bool CMux::Muxing()
 	mux_cfg.vid.width = 720;
 	mux_cfg.vid.height = 288;
 	mux_cfg.vid.max_gop = 30;
-#endif
 
-	Json::Value meta;
-	Json::Value mux_files;
-#if 0
 	meta["filename"] = m_filename;
 	meta["channel"] = m_nChannel;
 	meta["codec"] = mux_cfg.vid.codec;
 	meta["type"] = m_type;
 	CreateMetaJson(meta, group_name);
 #endif
-	string channel;
 
+	string channel;
 	FILE *es = NULL;
 	FILE *pAudio = NULL;
 
@@ -377,7 +377,7 @@ bool CMux::Muxing()
 #if __DEBUG
 				_d("current frame : %d\n", m_nFrameCount);
 #endif
-				int nDstFrame = (m_nRecSec + 1) * mux_cfg.vid.fps;
+				int nDstFrame = (m_nRecSec + 1) * AUDIO_FRAME_LEN;
 				if (m_nAudioCount >= nDstFrame)
 				{
 					int finalAudioCount = 0;

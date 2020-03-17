@@ -26,8 +26,10 @@ CRecv::~CRecv(void)
 	pthread_mutex_destroy(&m_mutex_recv);
 }
 
-bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
+// nType 0 : 상시녹화 1 : 이벤트 녹화
+bool CRecv::Create(int nType, Json::Value info, Json::Value attr, int nChannel)
 {
+	m_nProgramType = nType;
 	m_info = info;
 	m_nChannel = nChannel;
 	m_attr = attr;
@@ -90,10 +92,9 @@ bool CRecv::Create(Json::Value info, Json::Value attr, int nChannel)
 	m_queue->SetInfo(m_nChannel, m_type);
 
 	Start();
-	//m_queue->Enable();
 	m_mux = new CMux();
 	m_mux->SetQueue(&m_queue, m_nChannel);
-	m_mux->Create(info, attr, m_nChannel);
+	m_mux->Create(m_nProgramType, info, attr, m_nChannel);
 
 	return true;
 }

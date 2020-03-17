@@ -193,7 +193,7 @@ int CQueue::Get(AVPacket *pkt, int *codec_type, int *recv_type)
 
 	if (m_pkt[m_nReadPos]->size > 0)
 	{
-#if 1
+#if __DEBUG
 		cout << "[QUEUE.ch" << m_nChannel << "] m_nReadPos : " << m_nReadPos << ", size : " << m_pkt[m_nReadPos]->size << endl;
 #endif
 		//av_init_packet(pkt);

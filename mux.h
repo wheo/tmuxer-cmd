@@ -13,7 +13,7 @@ public:
 
 	//int ReadSocket(uint8_t *buffer, unsigned bufferSize);
 	bool TX(char *buff, int size);
-	bool Create(Json::Value info, Json::Value attr, int nChannel);
+	bool Create(int nProgramType, Json::Value info, Json::Value attr, int nChannel);
 	void Delete();
 	bool SetQueue(CQueue **queue, int nChannel);
 
@@ -21,6 +21,7 @@ public:
 	void SetConfig(mux_cfg_s *mux_cfg, int codec_type, int recv_type);
 
 protected:
+	int m_nProgramType; // 0 상시녹화, 1 이벤트녹화
 	int m_nChannel;		// 현재 채널 넘버
 	Json::Value m_info; // 채널 정보 json
 	Json::Value m_attr; // 채널 공유 속성 attribute

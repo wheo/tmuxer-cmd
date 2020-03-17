@@ -3,6 +3,7 @@
 CCommMgr::CCommMgr()
 {
 	m_bExit = false;
+	m_bIsRunning = false;
 	pthread_mutex_init(&m_mutex_comm, 0);
 	m_RecvBuf = new char[MAX_RECV_BUFFER];
 }
@@ -57,8 +58,10 @@ bool CCommMgr::SetSocket()
 	return true;
 }
 
-bool CCommMgr::Open(int nPort, Json::Value attr)
+//nType : 0 상시녹화, 1 : 이벤트 녹화
+bool CCommMgr::Open(int nType, int nPort, Json::Value attr)
 {
+	m_nType = nType;
 	m_nChannel = 0;
 	m_bIsRunning = false;
 	m_nPort = nPort;
@@ -73,32 +76,9 @@ bool CCommMgr::Open(int nPort, Json::Value attr)
 	return true;
 }
 
-bool CCommMgr::ReadBuffer()
+void CCommMgr::Run()
 {
-	// memcpy(&m_sin, &sin, sizeof(sin));
-
-	mux_cfg_s *mux_cfg;
-
-	//Json::Value root;
-	string strbuf;
-	strbuf = (char *)m_RecvBuf;
-
-	if (reader.parse(strbuf, m_root, true))
-	{
-		//parse success
-		if (m_root["cmd"] == "save_start")
-		{
-			MuxStart();
-		}
-		else if (m_root["cmd"] == "save_stop")
-		{
-			MuxStop();
-		}
-	}
-	else
-	{
-		cout << "[COMM] message is json" << endl;
-	}
+	RX();
 }
 
 bool CCommMgr::RX()
@@ -143,7 +123,35 @@ bool CCommMgr::TX(char *buff, int size)
 	sin.sin_port = htons(m_attr["udp_target_port"].asInt());
 
 	sendto(m_sdSend, buff, size, 0, (struct sockaddr *)&sin, sin_size);
-	cout << "[COMM] ip : " << inet_ntoa(sin.sin_addr) << " port : " << m_nPort << ", send message(" << size << ") : " << buff << endl;
+	cout << "[COMM] ip : " << inet_ntoa(sin.sin_addr) << " port : " << m_nPort << ", send message(" << size << ")" << endl;
+}
+
+bool CCommMgr::ReadBuffer()
+{
+	// memcpy(&m_sin, &sin, sizeof(sin));
+
+	mux_cfg_s *mux_cfg;
+
+	//Json::Value root;
+	string strbuf;
+	strbuf = (char *)m_RecvBuf;
+
+	if (reader.parse(strbuf, m_root, true))
+	{
+		//parse success
+		if (m_root["cmd"] == "save_start")
+		{
+			MuxStart();
+		}
+		else if (m_root["cmd"] == "save_stop")
+		{
+			MuxStop();
+		}
+	}
+	else
+	{
+		cout << "[COMM] message is json" << endl;
+	}
 }
 
 bool CCommMgr::MuxStart()
@@ -167,7 +175,8 @@ bool CCommMgr::MuxStart()
 			m_attr["folder_name"] = get_current_time_and_date();
 		}
 
-		for (auto &value : m_attr["channels"])
+		//for (auto &value : m_attr["channels"])
+		for (int i = 0; i < MAX_ALL_CHANNEL_COUNT; i++)
 		{
 			//cout << "file_name : " << root["info"]["file_name"].asString() << endl;
 			//cout << "m_attr[folder_name] : " << m_attr["folder_name"].asString() << endl;
@@ -178,7 +187,7 @@ bool CCommMgr::MuxStart()
 				//result = bit_state & (1 << m_nChannel);
 			}
 			m_CRecv[m_nChannel] = new CRecv();
-			if (m_CRecv[m_nChannel]->Create(m_attr["channels"][m_nChannel], m_attr, m_nChannel))
+			if (m_CRecv[m_nChannel]->Create(m_nType, m_attr["channels"][m_nChannel], m_attr, m_nChannel))
 			{
 				cout << "[COMM] Recv(" << m_nChannel << ") thread is created" << endl;
 			}
@@ -210,10 +219,10 @@ bool CCommMgr::MuxStop()
 {
 	if (m_bIsRunning == true)
 	{
+		m_bIsRunning = false;
 		Delete();
 		_d("[COMM] muxing completed\n");
 		m_nChannel = 0;
-		m_bIsRunning = false;
 	}
 	else
 	{
@@ -223,25 +232,20 @@ bool CCommMgr::MuxStop()
 
 bool CCommMgr::Restart()
 {
-	if (m_bIsRunning)
+	if (m_bIsRunning == true)
 	{
 		MuxStop();
-		usleep(10000);
 		MuxStart();
+		cout << "[COMM] Recv(" << m_nChannel << ") muxer is restarted" << endl;
 	}
 
 	return true;
 }
 
-void CCommMgr::Run()
-{
-	RX();
-}
-
 void CCommMgr::Delete()
 {
-	cout << "[COMM] DELETE : " << m_nChannel << endl;
-	for (int i = 0; i < m_nChannel; i++)
+	cout << "[COMM] DELETE channel count : " << m_nChannel << endl;
+	for (int i = 0; i < MAX_ALL_CHANNEL_COUNT; i++)
 	{
 		SAFE_DELETE(m_CRecv[i]);
 	}
